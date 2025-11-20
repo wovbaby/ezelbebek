@@ -1,0 +1,22 @@
+{
+  "name": "Ezel Bebek Takip",
+  "short_name": "Ezel Bebek",
+  "description": "Bebek gelişimi, takas ve yardımlaşma platformu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
