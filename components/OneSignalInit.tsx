@@ -5,20 +5,20 @@ import OneSignal from 'react-onesignal';
 
 export default function OneSignalInit() {
   useEffect(() => {
-    // Sadece tarayıcı tarafında çalışsın
     if (typeof window !== "undefined") {
       const runOneSignal = async () => {
         try {
           await OneSignal.init({
-            appId: "3d11c397-1c73-4949-a1e9-5f9d206d7218", // Senin ID'n
+            appId: "3d11c397-1c73-4949-a1e9-5f9d206d7218",
             
-            // --- EKLENEN AYARLAR (HATAYI ÇÖZER) ---
-            serviceWorkerPath: "OneSignalSDKWorker.js", // Dosya adını elle gösterdik
-            serviceWorkerParam: { scope: "/" }, // Tüm siteyi kapsasın
-            // --------------------------------------
+            // --- DÜZELTME BURADA ---
+            // Başlarına / koyduk ki her yerden bulabilsin
+            serviceWorkerPath: "/OneSignalSDKWorker.js", 
+            serviceWorkerParam: { scope: "/" },
+            // -----------------------
 
             notifyButton: {
-              enable: true, // Sağ altta kırmızı zil butonu çıkar
+              enable: true, 
             },
             promptOptions: {
               slidedown: {
@@ -33,7 +33,7 @@ export default function OneSignalInit() {
                     },
                     delay: {
                       pageViews: 1,
-                      timeDelay: 5, // 5 saniye sonra sor
+                      timeDelay: 5, 
                     },
                   },
                 ],
@@ -49,5 +49,5 @@ export default function OneSignalInit() {
     }
   }, []);
 
-  return null; // Bu bileşen ekranda görünmez, sadece arkada çalışır
+  return null;
 }
