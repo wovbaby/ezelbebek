@@ -11,7 +11,7 @@ export default function BottomNav() {
     { name: 'Ana Sayfa', href: '/', icon: Home },
     { name: 'Gelişim', href: '/gelisim', icon: Activity },
     { name: 'Takas', href: '/takas', icon: Repeat },
-    { name: 'Medya', href: '/medya', icon: Music }, // YENİ EKLENEN MODÜL
+    { name: 'Medya', href: '/medya', icon: Music }, // YENİ: Müzik ve Masallar
     { name: 'Forum', href: '/forum', icon: MessageCircle },
     { name: 'Profil', href: '/profil', icon: User },
   ];

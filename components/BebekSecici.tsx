@@ -55,3 +55,12 @@ export default function BebekSecici({ bebekler, seciliId }: { bebekler: any[], s
     </div>
   );
 }
+// ... importlara Heart ekle ...
+import { ChevronDown, Check, Plus, Heart } from 'lucide-react';
+
+// ... return içindeki menü listesinin EN ALTINA (Yeni Bebek Ekle'nin altına):
+
+<Link href="/anne" className="w-full text-left px-4 py-3 text-xs font-bold text-pink-600 bg-pink-50 hover:bg-pink-100 flex items-center gap-2 border-t border-pink-100">
+    <Heart className="w-4 h-4" />
+    Anne Profili
+</Link>

@@ -306,3 +306,51 @@ export async function asiIsaretle(asiId: number, yapildi: boolean) {
   revalidatePath('/asi-takvimi'); // Sayfayı yenile
   return true;
 }
+// ... (önceki kodların altına)
+
+// 8. ANNE - Su İçme
+export async function suIc() {
+  // Önce mevcut sayıyı al
+  const { data } = await supabase.from('anne_profili').select('icilen_su').single();
+  const yeniSayi = (data?.icilen_su || 0) + 1;
+
+  const { error } = await supabase
+    .from('anne_profili')
+    .update({ icilen_su: yeniSayi })
+    .eq('id', 1);
+
+  if (error) return false;
+  revalidatePath('/anne');
+  return true;
+}
+
+// 9. ANNE - Suyu Sıfırla
+export async function suSifirla() {
+  const { error } = await supabase
+    .from('anne_profili')
+    .update({ icilen_su: 0 })
+    .eq('id', 1);
+  
+  revalidatePath('/anne');
+  return true;
+}
+
+// 10. ANNE - Döngü Ayarları
+export async function anneGuncelle(formData: FormData) {
+  const son_adet_tarihi = formData.get('son_adet_tarihi') as string;
+  const dongu_suresi = formData.get('dongu_suresi') as string;
+  const kilo = formData.get('kilo') as string;
+
+  const { error } = await supabase
+    .from('anne_profili')
+    .update({ 
+        son_adet_tarihi, 
+        dongu_suresi: parseInt(dongu_suresi),
+        kilo: parseFloat(kilo)
+    })
+    .eq('id', 1);
+
+  if (error) return false;
+  revalidatePath('/anne');
+  return true;
+}
