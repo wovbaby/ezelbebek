@@ -306,49 +306,63 @@ export async function asiIsaretle(asiId: number, yapildi: boolean) {
   revalidatePath('/asi-takvimi'); // Sayfayı yenile
   return true;
 }
-// 8. ANNE - Su İçme
-export async function suIc() {
-  // Önce mevcut sayıyı al
-  const { data } = await supabase.from('anne_profili').select('icilen_su').single();
-  const yeniSayi = (data?.icilen_su || 0) + 1;
-
-  const { error } = await supabase
-    .from('anne_profili')
-    .update({ icilen_su: yeniSayi })
-    .eq('id', 1);
-
-  if (error) return false;
-  revalidatePath('/anne');
-  return true;
-}
-
-// 9. ANNE - Suyu Sıfırla
-export async function suSifirla() {
-  const { error } = await supabase
-    .from('anne_profili')
-    .update({ icilen_su: 0 })
-    .eq('id', 1);
-  
-  revalidatePath('/anne');
-  return true;
-}
-
-// 10. ANNE - Döngü Ayarları
+// 10. ANNE - Profil, Döngü ve Hedef Ayarları (FOTOĞRAF DESTEKLİ)
 export async function anneGuncelle(formData: FormData) {
   const son_adet_tarihi = formData.get('son_adet_tarihi') as string;
   const dongu_suresi = formData.get('dongu_suresi') as string;
-  const kilo = formData.get('kilo') as string;
+  const su_hedefi = formData.get('su_hedefi') as string;
+  const ad = formData.get('ad') as string; // İsim değiştirme de ekleyelim
+  
+  // --- YENİ: RESİM YÜKLEME KISMI ---
+  const resimDosyasi = formData.get('resim') as File;
+  let resimUrl = null;
 
+  if (resimDosyasi && resimDosyasi.size > 0) {
+    try {
+      const arrayBuffer = await resimDosyasi.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Cloudinary'ye yükle (Anne klasörüne)
+      const uploadResult: any = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            folder: 'anne-profil',
+            transformation: [
+               { width: 200, height: 200, crop: "fill", gravity: "face" }, // Yüzü ortala, kare yap
+               { quality: "auto" }
+            ] 
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        ).end(buffer);
+      });
+      resimUrl = uploadResult.secure_url;
+    } catch (error) {
+      console.error("Anne profil resmi yükleme hatası:", error);
+    }
+  }
+  // -----------------------------------
+
+  // Güncellenecek veriyi hazırla
+  const veri: any = { id: 1 };
+
+  if (ad) veri.ad = ad;
+  if (son_adet_tarihi) veri.son_adet_tarihi = son_adet_tarihi;
+  if (dongu_suresi) veri.dongu_suresi = parseInt(dongu_suresi);
+  if (su_hedefi) veri.su_hedefi = parseInt(su_hedefi);
+  if (resimUrl) veri.resim_url = resimUrl; // Yeni resim varsa ekle
+  
   const { error } = await supabase
     .from('anne_profili')
-    .update({ 
-        son_adet_tarihi, 
-        dongu_suresi: parseInt(dongu_suresi),
-        kilo: parseFloat(kilo)
-    })
-    .eq('id', 1);
+    .upsert(veri, { onConflict: 'id' });
 
-  if (error) return false;
+  if (error) {
+    console.error('Anne güncelleme hatası:', error);
+    return false;
+  }
+  
   revalidatePath('/anne');
   return true;
 }
