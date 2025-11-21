@@ -12,98 +12,92 @@ export default async function Home() {
   const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
   const { data: tumBebekler } = await supabase.from('bebekler').select('id, ad, resim_url');
   
-  // Aktif bebeği bul
   const aktifId = (seciliId && tumBebekler?.find(b => b.id === seciliId)) ? seciliId : tumBebekler?.[0]?.id;
   const seciliBebek = tumBebekler?.find(b => b.id === aktifId);
 
-  // Logları çek
   const { data: aktiviteler } = await supabase
     .from('aktiviteler')
     .select('*')
     .eq('bebek_id', aktifId)
     .order('created_at', { ascending: false })
-    .limit(20); // Daha fazla log gösterelim
+    .limit(20);
 
   return (
-    // h-screen ve overflow-hidden: Sayfanın tamamını ekrana sabitler
     <main className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       
-      {/* --- SABİT ÜST BAR (HEADER) --- */}
-      {/* z-40 verdik ki içerik kayarken bunun altından geçsin */}
-      <header className="flex-none bg-blue-600 text-white pt-8 pb-10 px-6 rounded-b-[3rem] shadow-xl z-40 relative">
+      {/* --- YENİ HEADER TASARIMI (Tam Ekran Resim) --- */}
+      <header className="flex-none h-72 relative z-40 rounded-b-[3rem] overflow-hidden shadow-xl bg-blue-600">
         
-        <div className="flex flex-col items-center gap-4">
+        {/* 1. Arkaplan Resmi */}
+        {seciliBebek?.resim_url ? (
+            <img 
+                src={seciliBebek.resim_url} 
+                alt={seciliBebek.ad} 
+                className="absolute inset-0 w-full h-full object-cover"
+            />
+        ) : (
+            // Resim yoksa varsayılan desen
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <Baby className="w-32 h-32 text-white/20" />
+            </div>
+        )}
+
+        {/* 2. Karartma Katmanı (Yazılar okunsun diye) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+
+        {/* 3. İçerik (Bebek Seçici ve İsim) */}
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 px-6">
             
-            {/* BEBEK SEÇİCİ (En Üstte) */}
-            {/* z-50 vererek en üste çıkardık, menü açılınca altta kalmaz */}
-            <div className="relative z-50">
-                <BebekSecici bebekler={tumBebekler || []} seciliId={aktifId} />
+            {/* Bebek Seçici (En üstte sağda dursun mu? Hayır, ortada kalsın) */}
+            <div className="absolute top-6 right-6 z-50">
+                 <BebekSecici bebekler={tumBebekler || []} seciliId={aktifId} />
             </div>
 
-            {/* KOCAMAN PROFİL FOTOSU */}
-            <div className="relative">
-                <div className="w-24 h-24 rounded-full p-1 bg-white/20 backdrop-blur-md border-2 border-white/30 shadow-lg">
-                    {seciliBebek?.resim_url ? (
-                        <img 
-                            src={seciliBebek.resim_url} 
-                            alt={seciliBebek.ad} 
-                            className="w-full h-full rounded-full object-cover bg-white"
-                        />
-                    ) : (
-                        <div className="w-full h-full rounded-full bg-white/90 flex items-center justify-center text-blue-300">
-                            <Baby className="w-12 h-12" />
-                        </div>
-                    )}
-                </div>
-                {/* Online Noktası Süsü (İsteğe bağlı) */}
-                <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-400 border-2 border-blue-600 rounded-full"></div>
+            <div className="text-center text-white z-10">
+                <h2 className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">Hoş Geldin</h2>
+                <h1 className="text-4xl font-bold tracking-tight drop-shadow-md">{seciliBebek?.ad || "Bebek"}</h1>
             </div>
-
-            <div className="text-center">
-                <h2 className="text-blue-100 text-xs font-medium uppercase tracking-widest">Hoş Geldin</h2>
-                <h1 className="text-3xl font-bold tracking-wide mt-1">{seciliBebek?.ad || "Bebek"}</h1>
-            </div>
-
         </div>
       </header>
 
-      {/* --- KAYDIRILABİLİR İÇERİK ALANI --- */}
-      {/* flex-1: Kalan boşluğu doldur */}
-      {/* overflow-y-auto: Sadece bu kısım kaydırılsın */}
-      <div className="flex-1 overflow-y-auto relative -mt-6 pt-6 pb-32 px-6 z-30 scrollbar-hide">
+      {/* --- İÇERİK ALANI --- */}
+      <div className="flex-1 overflow-y-auto relative -mt-8 pt-8 pb-32 px-5 z-30 scrollbar-hide">
         
-        {/* HIZLI İŞLEM BUTONLARI */}
-        <HizliIslem />
+        {/* HIZLI İŞLEM (Biraz küçültülmüş hali) */}
+        {/* scale-90 ile tüm bloğu %10 küçülttük */}
+        <div className="scale-95 origin-top"> 
+            <HizliIslem />
+        </div>
 
         {/* CANLI LOG LİSTESİ */}
-        <div className="mt-6">
-            <h3 className="text-gray-800 font-bold text-lg mb-4 flex items-center gap-2">
+        <div className="mt-2">
+            <h3 className="text-gray-800 font-bold text-md mb-3 flex items-center gap-2 ml-1">
                 Son Hareketler
-                <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded-full">Bugün</span>
+                <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Bugün</span>
             </h3>
             
-            <div className="space-y-3">
+            <div className="space-y-2.5">
                 {aktiviteler?.map((islem) => {
                     let Icon = Baby;
                     let colorClass = "bg-gray-100 text-gray-600";
                     
-                    if (islem.tip === 'mama') { Icon = Utensils; colorClass = "bg-orange-100 text-orange-600"; }
-                    if (islem.tip === 'bez') { Icon = Wind; colorClass = "bg-blue-100 text-blue-600"; }
-                    if (islem.tip === 'uyku') { Icon = Moon; colorClass = "bg-indigo-100 text-indigo-600"; }
+                    if (islem.tip === 'mama') { Icon = Utensils; colorClass = "bg-orange-50 text-orange-600"; }
+                    if (islem.tip === 'bez') { Icon = Wind; colorClass = "bg-blue-50 text-blue-600"; }
+                    if (islem.tip === 'uyku') { Icon = Moon; colorClass = "bg-indigo-50 text-indigo-600"; }
 
                     return (
-                        <div key={islem.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform active:scale-95">
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${colorClass}`}>
-                                <Icon className="w-6 h-6" /> 
+                        <div key={islem.id} className="bg-white p-3 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-50 flex items-center gap-3 transition-transform active:scale-95">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${colorClass}`}>
+                                <Icon className="w-5 h-5" /> 
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-center">
-                                    <p className="text-base font-bold text-gray-800 capitalize">{islem.tip}</p>
-                                    <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+                                    <p className="text-sm font-bold text-gray-800 capitalize">{islem.tip}</p>
+                                    <span className="text-[10px] font-bold text-gray-400">
                                         {new Date(islem.created_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}
                                     </span>
                                 </div>
-                                <p className="text-sm text-gray-500 font-medium mt-0.5 truncate">
+                                <p className="text-xs text-gray-500 font-medium mt-0.5 truncate">
                                     {islem.detay || "Detay girilmedi"}
                                 </p>
                             </div>
@@ -112,9 +106,8 @@ export default async function Home() {
                 })}
                 
                 {(!aktiviteler || aktiviteler.length === 0) && (
-                    <div className="text-center py-12 opacity-50">
-                        <Baby className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                        <p className="text-gray-400 text-sm">Henüz kayıt yok.</p>
+                    <div className="text-center py-8 opacity-50">
+                        <p className="text-gray-400 text-xs">Henüz kayıt yok.</p>
                     </div>
                 )}
             </div>
