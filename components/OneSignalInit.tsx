@@ -11,7 +11,12 @@ export default function OneSignalInit() {
         try {
           await OneSignal.init({
             appId: "3d11c397-1c73-4949-a1e9-5f9d206d7218", // Senin ID'n
-            allowLocalhostAsSecureOrigin: true, // Test için
+            
+            // --- EKLENEN AYARLAR (HATAYI ÇÖZER) ---
+            serviceWorkerPath: "OneSignalSDKWorker.js", // Dosya adını elle gösterdik
+            serviceWorkerParam: { scope: "/" }, // Tüm siteyi kapsasın
+            // --------------------------------------
+
             notifyButton: {
               enable: true, // Sağ altta kırmızı zil butonu çıkar
             },
