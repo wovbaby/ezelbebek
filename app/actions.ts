@@ -3,9 +3,9 @@
 import { supabase } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
-import { cookies } from 'next/headers'; // Çoklu çocuk için gerekli
+import { cookies } from 'next/headers';
 
-// Cloudinary Ayarlarını Yapılandır
+// Cloudinary Ayarları
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -14,94 +14,46 @@ cloudinary.config({
 });
 
 // --- YARDIMCI: SEÇİLİ BEBEK ID'SİNİ BUL ---
-// Cookie'den hangi bebeğin seçili olduğunu okur
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
-  
-  // Eğer cookie yoksa varsayılan olarak 1. bebeği (veya veritabanındaki ilkini) döndürürüz
-  // Şimdilik basit tutmak için 1 dönüyoruz, gerçekte auth user'ın ilk bebeği olmalı
   return seciliId ? parseInt(seciliId) : 1; 
 }
 
-// --- YENİ: BEBEK DEĞİŞTİRME ---
-// Kullanıcı menüden bebek seçince bu çalışır
+// --- BEBEK DEĞİŞTİRME ---
 export async function bebekSec(bebekId: number) {
   const cookieStore = await cookies();
   cookieStore.set('secili_bebek', bebekId.toString());
-  revalidatePath('/'); // Tüm siteyi yenile ki veriler değişsin
+  revalidatePath('/'); 
 }
 
-// 1. Aktivite (Hızlı İşlem) Ekleme - DİNAMİK
+// 1. AKTİVİTE EKLEME
 export async function aktiviteEkle(tip: string, detay: string) {
-  const bebekId = await getSeciliBebekId(); // Seçili bebeği al
-
-  const { error } = await supabase
-    .from('aktiviteler')
-    .insert([
-      { 
-        bebek_id: bebekId, // Dinamik ID
-        tip: tip,
-        detay: detay
-      }
-    ]);
-
-  if (error) {
-    console.error('Aktivite hatası:', error);
-    return false;
-  }
-
+  const bebekId = await getSeciliBebekId();
+  const { error } = await supabase.from('aktiviteler').insert([{ bebek_id: bebekId, tip, detay }]);
+  if (error) return false;
   revalidatePath('/');
   return true;
 }
 
-// 2. Günlük Not Ekleme / Güncelleme - DİNAMİK
+// 2. GÜNLÜK NOT
 export async function notKaydet(tarih: string, icerik: string) {
-  const bebekId = await getSeciliBebekId(); // Seçili bebeği al
-
-  const { error } = await supabase
-    .from('gunluk_notlar')
-    .upsert(
-      { 
-        bebek_id: bebekId, 
-        tarih: tarih, 
-        icerik: icerik 
-      }, 
-      { onConflict: 'bebek_id, tarih' }
-    );
-
-  if (error) {
-    console.error('Not hatası:', error);
-    return false;
-  }
-
+  const bebekId = await getSeciliBebekId();
+  const { error } = await supabase.from('gunluk_notlar').upsert({ bebek_id: bebekId, tarih, icerik }, { onConflict: 'bebek_id, tarih' });
+  if (error) return false;
   revalidatePath('/gelisim');
   return true;
 }
 
-// 3. Forum Konusu Ekle (Herkese Açık)
+// 3. FORUM KONUSU
 export async function konuEkle(baslik: string, icerik: string, kategori: string) {
-  const { error } = await supabase
-    .from('forum_konulari')
-    .insert([
-      { 
-        baslik, 
-        icerik, 
-        kategori, 
-        yazar_ad: 'Anonim Anne' 
-      }
-    ]);
-
-  if (error) {
-    console.error('Konu ekleme hatası:', error);
-    return false;
-  }
-
+  const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: 'Anonim Anne' }]);
+  if (error) return false;
   revalidatePath('/forum');
   return true;
 }
 
-// 4. Takas İlanı Ekle (Herkese Açık)
+// 4. TAKAS İLANI (Resimli + İlçeli)
 export async function ilanEkle(formData: FormData) {
   const baslik = formData.get('baslik') as string;
   const fiyat = formData.get('fiyat') as string;
@@ -117,203 +69,124 @@ export async function ilanEkle(formData: FormData) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-
       const uploadResult: any = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream(
-          {
-            folder: 'bebek-pwa-urunler', 
-            transformation: [
-               { width: 800, crop: "limit" },
-               { quality: "auto" },
-               { fetch_format: "auto" }
-            ] 
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+          { folder: 'bebek-pwa-urunler', transformation: [{ width: 800, crop: "limit" }, { quality: "auto" }, { fetch_format: "auto" }] },
+          (error, result) => { if (error) reject(error); else resolve(result); }
         ).end(buffer);
       });
       resimUrl = uploadResult.secure_url;
-    } catch (error) {
-      console.error("Cloudinary ürün yükleme hatası:", error);
-    }
+    } catch (error) { console.error("Resim hatası:", error); }
   }
 
-  const { error } = await supabase
-    .from('urunler')
-    .insert([
-      { 
-        baslik, fiyat, kategori, sehir, ilce, durum,
-        resim_url: resimUrl,
-        iletisim: '0555-XXX-XX-XX'
-      }
-    ]);
-
-  if (error) {
-    console.error('İlan ekleme hatası:', error);
-    return false;
-  }
-
+  const { error } = await supabase.from('urunler').insert([{ baslik, fiyat, kategori, sehir, ilce, durum, resim_url: resimUrl, iletisim: '0555-XXX-XX-XX' }]);
+  if (error) return false;
   revalidatePath('/takas');
   return true;
 }
 
-// 5. Profil Güncelle (DİNAMİK - SEÇİLİ BEBEĞİ GÜNCELLER)
+// 5. BEBEK PROFİL GÜNCELLEME (Resimli)
 export async function profilGuncelle(formData: FormData) {
-  const bebekId = await getSeciliBebekId(); // Hangi bebeği düzenliyoruz?
-
+  const bebekId = await getSeciliBebekId();
   const ad = formData.get('ad') as string;
   const dogum_tarihi = formData.get('dogum_tarihi') as string;
   const cinsiyet = formData.get('cinsiyet') as string;
   const boy = formData.get('boy') as string;
   const kilo = formData.get('kilo') as string;
-  
   const resimDosyasi = formData.get('resim') as File;
+  
   let resimUrl = null;
-
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-
       const uploadResult: any = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream(
-          {
-            folder: 'bebek-profil',
-            transformation: [
-               { width: 400, height: 400, crop: "fill", gravity: "face" },
-               { quality: "auto" },
-               { fetch_format: "auto" }
-            ] 
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+          { folder: 'bebek-profil', transformation: [{ width: 400, height: 400, crop: "fill", gravity: "face" }, { quality: "auto" }] },
+          (error, result) => { if (error) reject(error); else resolve(result); }
         ).end(buffer);
       });
       resimUrl = uploadResult.secure_url;
-    } catch (error) {
-      console.error("Profil resmi yükleme hatası:", error);
-    }
+    } catch (error) { console.error("Profil resim hatası:", error); }
   }
 
-  const guncellenecekVeri: any = { 
-    ad, dogum_tarihi, cinsiyet,
-    boy: parseFloat(boy), kilo: parseFloat(kilo)
-  };
+  const guncellenecekVeri: any = { ad, dogum_tarihi, cinsiyet, boy: parseFloat(boy), kilo: parseFloat(kilo) };
+  if (resimUrl) guncellenecekVeri.resim_url = resimUrl;
 
-  if (resimUrl) {
-    guncellenecekVeri.resim_url = resimUrl;
-  }
-
-  const { error } = await supabase
-    .from('bebekler')
-    .update(guncellenecekVeri)
-    .eq('id', bebekId); // ARTIK SABİT DEĞİL, DİNAMİK
-
-  if (error) {
-    console.error('Profil güncelleme hatası:', error);
-    return false;
-  }
-
-  revalidatePath('/profil');
-  revalidatePath('/'); 
+  const { error } = await supabase.from('bebekler').update(guncellenecekVeri).eq('id', bebekId);
+  if (error) return false;
+  revalidatePath('/profil'); revalidatePath('/');
   return true;
 }
 
-// 6. YENİ BEBEK EKLEME (YENİ FONKSİYON)
+// 6. YENİ BEBEK EKLEME
 export async function yeniBebekEkle(formData: FormData) {
   const ad = formData.get('ad') as string;
   const dogum_tarihi = formData.get('dogum_tarihi') as string;
   const cinsiyet = formData.get('cinsiyet') as string;
   const boy = formData.get('boy') as string;
   const kilo = formData.get('kilo') as string;
-  
   const resimDosyasi = formData.get('resim') as File;
+  
   let resimUrl = null;
-
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-
       const uploadResult: any = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream(
-          {
-            folder: 'bebek-profil',
-            transformation: [{ width: 400, height: 400, crop: "fill", gravity: "face" }] 
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+          { folder: 'bebek-profil', transformation: [{ width: 400, height: 400, crop: "fill", gravity: "face" }] },
+          (error, result) => { if (error) reject(error); else resolve(result); }
         ).end(buffer);
       });
       resimUrl = uploadResult.secure_url;
-    } catch (error) {
-      console.error("Yeni bebek resim hatası:", error);
-    }
+    } catch (error) { console.error("Yeni bebek resim hatası:", error); }
   }
 
-  const { error } = await supabase
-    .from('bebekler')
-    .insert([{ 
-      ad, 
-      dogum_tarihi, 
-      cinsiyet,
-      boy: parseFloat(boy) || 0,
-      kilo: parseFloat(kilo) || 0,
-      resim_url: resimUrl,
-      // parent_id: '...' // İleride Auth gelince eklenecek
-    }]);
-
-  if (error) {
-    console.error('Bebek ekleme hatası:', error);
-    return false;
-  }
-
+  const { error } = await supabase.from('bebekler').insert([{ ad, dogum_tarihi, cinsiyet, boy: parseFloat(boy)||0, kilo: parseFloat(kilo)||0, resim_url: resimUrl }]);
+  if (error) return false;
   revalidatePath('/profil');
   return true;
 }
-// 7. Aşı İşaretleme / Kaldırma
+
+// 7. AŞI İŞARETLEME
 export async function asiIsaretle(asiId: number, yapildi: boolean) {
-  const bebekId = await getSeciliBebekId(); // Hangi bebek seçiliyse ona işlem yap
-
+  const bebekId = await getSeciliBebekId();
   if (yapildi) {
-    // Yapıldıysa ekle
-    const { error } = await supabase
-      .from('asi_durumu')
-      .insert([
-        { 
-          bebek_id: bebekId, 
-          asi_id: asiId, 
-          yapildi_mi: true, 
-          yapilma_tarihi: new Date().toISOString() // Şu anki tarih
-        }
-      ]);
-    if (error) console.error('Aşı ekleme hatası:', error);
+    const { error } = await supabase.from('asi_durumu').insert([{ bebek_id: bebekId, asi_id: asiId, yapildi_mi: true, yapilma_tarihi: new Date().toISOString() }]);
+    if (error) console.error('Aşı hata:', error);
   } else {
-    // İşaret kaldırıldıysa sil
-    const { error } = await supabase
-      .from('asi_durumu')
-      .delete()
-      .match({ bebek_id: bebekId, asi_id: asiId });
-    if (error) console.error('Aşı silme hatası:', error);
+    const { error } = await supabase.from('asi_durumu').delete().match({ bebek_id: bebekId, asi_id: asiId });
+    if (error) console.error('Aşı silme hata:', error);
   }
-
-  revalidatePath('/asi-takvimi'); // Sayfayı yenile
+  revalidatePath('/asi-takvimi');
   return true;
 }
-// 10. ANNE - Profil, Döngü ve Hedef Ayarları (FOTOĞRAF DESTEKLİ)
+
+// 8. ANNE - SU İÇME
+export async function suIc() {
+  const { data } = await supabase.from('anne_profili').select('icilen_su').single();
+  const yeniSayi = (data?.icilen_su || 0) + 1;
+  const { error } = await supabase.from('anne_profili').update({ icilen_su: yeniSayi }).eq('id', 1);
+  if (error) return false;
+  revalidatePath('/anne');
+  return true;
+}
+
+// 9. ANNE - SU SIFIRLA
+export async function suSifirla() {
+  const { error } = await supabase.from('anne_profili').update({ icilen_su: 0 }).eq('id', 1);
+  revalidatePath('/anne');
+  return true;
+}
+
+// 10. ANNE - GÜNCELLEME (Resimli)
 export async function anneGuncelle(formData: FormData) {
   const son_adet_tarihi = formData.get('son_adet_tarihi') as string;
   const dongu_suresi = formData.get('dongu_suresi') as string;
   const su_hedefi = formData.get('su_hedefi') as string;
-  const ad = formData.get('ad') as string; // İsim değiştirme de ekleyelim
+  const ad = formData.get('ad') as string;
   
-  // --- YENİ: RESİM YÜKLEME KISMI ---
   const resimDosyasi = formData.get('resim') as File;
   let resimUrl = null;
 
@@ -321,48 +194,25 @@ export async function anneGuncelle(formData: FormData) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-
-      // Cloudinary'ye yükle (Anne klasörüne)
       const uploadResult: any = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream(
-          {
-            folder: 'anne-profil',
-            transformation: [
-               { width: 200, height: 200, crop: "fill", gravity: "face" }, // Yüzü ortala, kare yap
-               { quality: "auto" }
-            ] 
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+          { folder: 'anne-profil', transformation: [{ width: 200, height: 200, crop: "fill", gravity: "face" }, { quality: "auto" }] },
+          (error, result) => { if (error) reject(error); else resolve(result); }
         ).end(buffer);
       });
       resimUrl = uploadResult.secure_url;
-    } catch (error) {
-      console.error("Anne profil resmi yükleme hatası:", error);
-    }
+    } catch (error) { console.error("Anne resim hata:", error); }
   }
-  // -----------------------------------
 
-  // Güncellenecek veriyi hazırla
   const veri: any = { id: 1 };
-
   if (ad) veri.ad = ad;
   if (son_adet_tarihi) veri.son_adet_tarihi = son_adet_tarihi;
   if (dongu_suresi) veri.dongu_suresi = parseInt(dongu_suresi);
   if (su_hedefi) veri.su_hedefi = parseInt(su_hedefi);
-  if (resimUrl) veri.resim_url = resimUrl; // Yeni resim varsa ekle
+  if (resimUrl) veri.resim_url = resimUrl;
   
-  const { error } = await supabase
-    .from('anne_profili')
-    .upsert(veri, { onConflict: 'id' });
-
-  if (error) {
-    console.error('Anne güncelleme hatası:', error);
-    return false;
-  }
-  
+  const { error } = await supabase.from('anne_profili').upsert(veri, { onConflict: 'id' });
+  if (error) return false;
   revalidatePath('/anne');
   return true;
 }
