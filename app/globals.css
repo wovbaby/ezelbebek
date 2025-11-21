@@ -3,3 +3,11 @@
 @tailwind utilities;
 
 /* Altına başka kodlar gelebilir, sorun yok */
+/* Kaydırma çubuğunu gizle ama kaydırmaya izin ver */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
