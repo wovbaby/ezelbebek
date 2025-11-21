@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 
-// PWA Eklentisini Çağır
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   cacheOnFrontEndNav: true,
@@ -14,15 +13,10 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
-  // 1. Bellek Hatasını Çözen Ayarlar (Çok Önemli)
-  eslint: {
-    ignoreDuringBuilds: true, // Derlemede lint hatasına bakma
-  },
+  // Not: eslint ayarını buradan kaldırdık (Next.js 16 kuralı)
   typescript: {
-    ignoreBuildErrors: true, // Derlemede tip hatasına bakma
+    ignoreBuildErrors: true, // TypeScript hatalarını görmezden gel
   },
-  // ------------------------------------------------
-
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
@@ -34,7 +28,7 @@ const nextConfig: NextConfig = {
         "localhost:3000", 
         "*.app.github.dev", 
         "*.github.dev",
-        "*.vercel.app" // Vercel adresini de ekledik
+        "*.vercel.app"
       ],
     },
   },
