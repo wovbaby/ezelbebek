@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
-import { ChevronLeft, ChevronRight, Syringe, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Syringe, Thermometer, ChevronRight as ChevronRightIcon } from 'lucide-react'; // İkonlar eklendi
 import GunlukNot from '@/components/GunlukNot';
 import TarihSecici from '@/components/TarihSecici';
 import Link from 'next/link';
@@ -28,7 +28,7 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
   const { data: aktiviteler } = await supabase
     .from('aktiviteler')
     .select('*')
-    .eq('bebek_id', seciliId) // Filtrele
+    .eq('bebek_id', seciliId)
     .gte('created_at', `${secilenTarih}T00:00:00`)
     .lte('created_at', `${secilenTarih}T23:59:59`)
     .order('created_at', { ascending: false });
@@ -36,7 +36,7 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
   const { data: notlar } = await supabase
     .from('gunluk_notlar')
     .select('icerik')
-    .eq('bebek_id', seciliId) // Filtrele
+    .eq('bebek_id', seciliId)
     .eq('tarih', secilenTarih)
     .limit(1);
   
@@ -60,29 +60,52 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
             </div>
         </header>
 
-        <div className="p-6 space-y-6 max-w-md mx-auto">
+        <div className="p-6 space-y-4 max-w-md mx-auto">
             
-            {/* AŞI TAKVİMİ BUTONU (YENİ) */}
-            <Link href="/asi-takvimi">
-                <div className="bg-gradient-to-r from-teal-500 to-green-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-teal-200 active:scale-95 transition-transform cursor-pointer mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-white/20 p-2 rounded-full border border-white/30">
-                            <Syringe className="w-6 h-6 text-white" />
+            {/* --- KISAYOL BUTONLARI --- */}
+            <div className="grid gap-4">
+                
+                {/* 1. AŞI TAKVİMİ (YEŞİL) */}
+                <Link href="/asi-takvimi">
+                    <div className="bg-gradient-to-r from-teal-500 to-green-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-teal-200 active:scale-95 transition-transform cursor-pointer">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white/20 p-2 rounded-full border border-white/30">
+                                <Syringe className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-md">Aşı Takvimi</h3>
+                                <p className="text-xs text-teal-100 opacity-90">Eksik aşıları kontrol et</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="font-bold text-md">Aşı Takvimi</h3>
-                            <p className="text-xs text-teal-100 opacity-90">Eksik aşıları kontrol et</p>
-                        </div>
+                        <ChevronRightIcon className="w-5 h-5 text-white/80" />
                     </div>
-                    <ChevronRightIcon className="w-5 h-5 text-white/80" />
-                </div>
-            </Link>
+                </Link>
+
+                {/* 2. ATEŞ TAKİBİ (KIRMIZI) - İŞTE BU EKSİKTİ */}
+                <Link href="/saglik/ates">
+                    <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-red-200 active:scale-95 transition-transform cursor-pointer">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white/20 p-2 rounded-full border border-white/30">
+                                <Thermometer className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-md">Ateş Takibi</h3>
+                                <p className="text-xs text-red-100 opacity-90">Derece ve ilaç kaydı</p>
+                            </div>
+                        </div>
+                        <ChevronRightIcon className="w-5 h-5 text-white/80" />
+                    </div>
+                </Link>
+
+            </div>
 
             {/* GÜNLÜK NOT */}
-            <GunlukNot tarih={secilenTarih} mevcutNot={gunlukNotMetni} />
+            <div className="mt-2">
+                <GunlukNot tarih={secilenTarih} mevcutNot={gunlukNotMetni} />
+            </div>
 
             {/* İSTATİSTİKLER */}
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center mt-4">
                 <div className="bg-white p-2 rounded-lg border border-gray-200">
                     <span className="block text-xs text-gray-400 uppercase font-bold">Mama</span>
                     <span className="font-bold text-orange-500 text-lg">
@@ -103,9 +126,9 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
                 </div>
             </div>
 
-            {/* LİSTE */}
+            {/* GÜNLÜK LİSTE */}
             <div>
-                <h3 className="text-gray-800 font-bold text-sm mb-3 ml-1">Günün Özeti</h3>
+                <h3 className="text-gray-800 font-bold text-sm mb-3 ml-1 mt-4">Günün Özeti</h3>
                 <div className="space-y-3 relative">
                     <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200"></div>
                     {aktiviteler?.map((islem) => (
@@ -139,23 +162,3 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
     </main>
   );
 }
-// importlara Thermometer ekle
-import { Thermometer } from 'lucide-react';
-
-// ... (Aşı Takvimi Link'inin hemen altına yapıştır)
-
-{/* ATEŞ TAKİBİ BUTONU */}
-<Link href="/saglik/ates">
-    <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-red-200 active:scale-95 transition-transform cursor-pointer mb-6 mt-2">
-        <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-full border border-white/30">
-                <Thermometer className="w-6 h-6 text-white" />
-            </div>
-            <div>
-                <h3 className="font-bold text-md">Ateş Takibi</h3>
-                <p className="text-xs text-red-100 opacity-90">Derece ve ilaç kaydı</p>
-            </div>
-        </div>
-        <ChevronRight className="w-5 h-5 text-white/80" />
-    </div>
-</Link>
