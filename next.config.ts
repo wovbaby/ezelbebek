@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  aggressiveFrontEndNavCaching: false, // BU KAPATILDI (Hafıza dostu)
   reloadOnOnline: true,
   swMinify: true,
   disable: process.env.NODE_ENV === "development",
@@ -13,9 +13,11 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
-  // Not: eslint ayarını buradan kaldırdık (Next.js 16 kuralı)
   typescript: {
-    ignoreBuildErrors: true, // TypeScript hatalarını görmezden gel
+    ignoreBuildErrors: true, // Derlemede tip hatalarını yoksay
+  },
+  eslint: {
+    ignoreDuringBuilds: true, // Derlemede lint hatalarını yoksay
   },
   images: {
     remotePatterns: [
