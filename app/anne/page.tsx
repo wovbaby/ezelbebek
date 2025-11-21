@@ -1,21 +1,65 @@
 import { supabase } from '@/lib/supabaseClient';
-import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Camera } from 'lucide-react'; // Camera ikonu eklendi
+import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Camera } from 'lucide-react';
 import { suIc, suSifirla, anneGuncelle } from '@/app/actions';
 
 export const revalidate = 0;
 
-const SOZLER = [
-    "Harika bir annesin! Bugün enerjin gökyüzü kadar yüksek.",
-    "Kendine bir kahve ısmarla, bunu hak ettin.",
-    "Senin mutluluğun, bebeğinin mutluluğu demek.",
-    "Bugün derin bir nefes al ve anın tadını çıkar.",
-    "Yorgunluk geçici, sevgin kalıcı. Harikasın!",
-    "Süper kahramanların pelerine ihtiyacı yoktur, senin gibi anne olurlar."
-];
+// --- GÜNLÜK MOTİVASYON ÜRETİCİSİ (AI SİMÜLASYONU) ---
+function motivasyonUret(anneAdi: string) {
+  // 1. Giriş (Hitap)
+  const girisler = [
+    `Günaydın ${anneAdi},`, 
+    `Harika bir gün seni bekliyor ${anneAdi},`, 
+    `Sevgili ${anneAdi}, bugün ışıl ışıl parlıyorsun,`,
+    `Biliyorum bazen yoruluyorsun ${anneAdi}, ama`,
+    `Hey süper kahraman ${anneAdi},`,
+    `Bugün gökyüzü senin için gülümsüyor ${anneAdi},`
+  ];
+
+  // 2. Durum Tespiti (Empati)
+  const durumlar = [
+    "annelik zorlu bir maraton ve sen harika gidiyorsun.",
+    "bebeğinin o gülüşü tüm uykusuz gecelere değiyor.",
+    "bugün kendine biraz şefkat gösterme zamanı.",
+    "sabır depon bazen azalabilir, bu çok normal.",
+    "yaptığın fedakarlıklar görünmez değil, hepsi birer mucize.",
+    "içindeki gücün farkında mısın? Dağları devirebilirsin."
+  ];
+
+  // 3. Aksiyon / Tavsiye
+  const tavsiyeler = [
+    "Şimdi derin bir nefes al ve omuzlarını gevşet.",
+    "O kahveyi soğutmadan içmeyi hak ettin.",
+    "Bugün ev işlerini boş ver, anın tadını çıkar.",
+    "Aynaya bak ve 'Ben harikayım' de, çünkü öylesin!",
+    "Bebeğin uyuduğunda sen de sadece uzan ve hiçbir şey yapma.",
+    "Sevdiğin bir şarkıyı aç ve modunu yükselt."
+  ];
+
+  // 4. Kapanış (Güçlendirme)
+  const sonlar = [
+    "Sen bu işi çok iyi biliyorsun.",
+    "Unutma, mükemmel değil mutlu anne lazım.",
+    "Senin mutluluğun evin güneşidir.",
+    "Yalnız değilsin, hepimiz aynı yoldayız.",
+    "Sana güveniyoruz!",
+    "Bugün senin günün olsun."
+  ];
+
+  // Rastgele Birleştir
+  const r1 = girisler[Math.floor(Math.random() * girisler.length)];
+  const r2 = durumlar[Math.floor(Math.random() * durumlar.length)];
+  const r3 = tavsiyeler[Math.floor(Math.random() * tavsiyeler.length)];
+  const r4 = sonlar[Math.floor(Math.random() * sonlar.length)];
+
+  return `${r1} ${r2} ${r3} ${r4}`;
+}
 
 export default async function AnnePage() {
   const { data: anne } = await supabase.from('anne_profili').select('*').single();
-  const gununSozu = SOZLER[Math.floor(Math.random() * SOZLER.length)];
+  
+  // Dinamik Mesajı Oluştur
+  const gununSozu = motivasyonUret(anne?.ad || "Anne");
 
   // --- DÖNGÜ HESAPLAMA ---
   let kalanGun = 0;
@@ -50,7 +94,7 @@ export default async function AnnePage() {
   return (
     <main className="min-h-screen bg-pink-50 pb-32">
         
-        {/* --- HEADER (GÜNCELLENDİ: RESİMLİ) --- */}
+        {/* HEADER */}
         <header className="p-6 bg-white shadow-sm rounded-b-[2.5rem] sticky top-0 z-10 border-b border-pink-100">
             <div className="flex items-center justify-between">
                 <div>
@@ -61,7 +105,7 @@ export default async function AnnePage() {
                     <p className="text-xs text-gray-400 mt-1 ml-1">Kendine iyi bak ki, dünya güzelleşsin.</p>
                 </div>
                 
-                {/* Profil Resmi Alanı */}
+                {/* Profil Resmi */}
                 <div className="w-14 h-14 bg-pink-100 rounded-full flex items-center justify-center border-2 border-white shadow-md overflow-hidden relative">
                     {anne?.resim_url ? (
                         <img src={anne.resim_url} alt="Anne" className="w-full h-full object-cover" />
@@ -74,7 +118,7 @@ export default async function AnnePage() {
 
         <div className="p-6 space-y-6">
             
-            {/* 1. GÜNÜN MESAJI */}
+            {/* 1. GÜNÜN MESAJI (DİNAMİK) */}
             <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-5 rounded-2xl text-white shadow-lg shadow-pink-200 relative overflow-hidden">
                 <Sparkles className="w-16 h-16 absolute -top-4 -right-4 text-white/20 rotate-12" />
                 <h3 className="font-bold text-xs flex items-center gap-2 mb-2 uppercase tracking-wider opacity-90">
@@ -83,7 +127,7 @@ export default async function AnnePage() {
                 <p className="text-sm font-medium italic leading-relaxed">"{gununSozu}"</p>
             </div>
 
-            {/* 2. REGL DÖNGÜSÜ VE PROFİL AYARLARI (GÜNCELLENDİ) */}
+            {/* 2. REGL DÖNGÜSÜ */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-pink-100">
                 <div className="flex justify-between items-start mb-4">
                     <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -95,16 +139,12 @@ export default async function AnnePage() {
                 </div>
 
                 <div className="flex gap-6">
-                    {/* Sayaç */}
                     <div className="flex flex-col items-center justify-center bg-pink-50 w-24 h-24 rounded-full border-4 border-pink-200 shrink-0">
                         <p className="text-3xl font-bold text-gray-800">{kalanGun}</p>
                         <p className="text-[9px] text-gray-500 uppercase font-bold">Gün Kaldı</p>
                     </div>
                     
-                    {/* --- FORM (RESİM VE İSİM EKLENDİ) --- */}
                     <form action={anneGuncelle} className="flex-1 space-y-3">
-                        
-                        {/* İsim ve Resim Seçme */}
                         <div className="flex gap-2">
                             <div className="flex-1">
                                 <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1">İsim</label>
@@ -119,13 +159,11 @@ export default async function AnnePage() {
                             </div>
                         </div>
 
-                        {/* Tarih */}
                         <div>
                             <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1">Son Adet Tarihi</label>
                             <input type="date" name="son_adet_tarihi" defaultValue={anne?.son_adet_tarihi} className="w-full p-2 bg-gray-50 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-pink-400 outline-none" />
                         </div>
                         
-                        {/* Döngü ve Kaydet */}
                         <div className="flex gap-2 items-end">
                             <div className="flex-1">
                                 <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1">Döngü (Gün)</label>
@@ -139,9 +177,8 @@ export default async function AnnePage() {
                 </div>
             </div>
 
-            {/* 3. SU TAKİBİ (AYNI KALDI) */}
+            {/* 3. SU TAKİBİ */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100 relative overflow-hidden">
-                {/* ... (Su takibi kodları öncekiyle birebir aynı) ... */}
                  <div className="flex justify-between items-center mb-4 relative z-10">
                     <h3 className="font-bold text-gray-800 flex items-center gap-2"><Droplets className="w-5 h-5 text-blue-500" /> Su Takibi</h3>
                     <form action={suSifirla}><button className="text-[10px] bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-500 px-2 py-1 rounded-full flex items-center gap-1 transition-colors"><RefreshCcw className="w-3 h-3" /> Sıfırla</button></form>
