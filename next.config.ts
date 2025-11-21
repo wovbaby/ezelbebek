@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: false, // BU KAPATILDI (Hafıza dostu)
+  aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swMinify: true,
   disable: process.env.NODE_ENV === "development",
@@ -13,18 +13,22 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
+  // TypeScript hatalarını görmezden gel
   typescript: {
-    ignoreBuildErrors: true, // Derlemede tip hatalarını yoksay
+    ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true, // Derlemede lint hatalarını yoksay
-  },
+  // DİKKAT: eslint ayarını buradan kaldırdık (Next.js 16 kuralı)
+  
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
     ],
   },
   experimental: {
+    // Bu boş turbopack ayarı, hatayı susturmak için gereklidir
+    turbopack: {
+      rules: {}, 
+    },
     serverActions: {
       allowedOrigins: [
         "localhost:3000", 
