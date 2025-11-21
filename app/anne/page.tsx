@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
-import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Camera } from 'lucide-react';
+import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Camera, Dumbbell, Flame } from 'lucide-react';
 import { suIc, suSifirla, anneGuncelle } from '@/app/actions';
+import Link from 'next/link';
 
 export const revalidate = 0;
 
@@ -195,6 +196,24 @@ export default async function AnnePage() {
                     </div>
                 </div>
             </div>
+
+            {/* 4. SPOR VE EGZERSİZ (YENİ) */}
+            <Link href="/anne/spor">
+                <div className="bg-orange-500 text-white p-5 rounded-2xl shadow-lg shadow-orange-200 mt-6 flex items-center justify-between cursor-pointer active:scale-95 transition-transform">
+                    <div>
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                            <Dumbbell className="w-5 h-5" /> Fit Anne
+                        </h3>
+                        <p className="text-xs text-orange-100 mt-1">Kısa ev egzersizleri</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-2xl font-bold flex items-center gap-1 justify-end">
+                            {anne?.yakilan_kalori || 0} <Flame className="w-4 h-4 fill-white" />
+                        </p>
+                        <p className="text-[10px] uppercase font-bold opacity-80">Yakılan Kalori</p>
+                    </div>
+                </div>
+            </Link>
 
         </div>
     </main>

@@ -242,3 +242,19 @@ export async function atesEkle(formData: FormData) {
   revalidatePath('/saglik/ates'); // Birazdan bu sayfayı yapacağız
   return true;
 }
+// ... (önceki kodların en altı)
+
+// 11. ANNE - SPOR (Kalori Ekle)
+export async function kaloriEkle(miktar: number) {
+  const { data } = await supabase.from('anne_profili').select('yakilan_kalori').single();
+  const yeniKalori = (data?.yakilan_kalori || 0) + miktar;
+
+  const { error } = await supabase
+    .from('anne_profili')
+    .update({ yakilan_kalori: yeniKalori })
+    .eq('id', 1);
+
+  if (error) return false;
+  revalidatePath('/anne'); // Anne sayfasını yenile
+  return true;
+}
