@@ -1,38 +1,87 @@
 import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabaseServer'; // Çıkış işlemi için gerekli
 import ProfilForm from '@/components/ProfilForm';
-import { Trophy, Star, Settings, LogOut } from 'lucide-react';
+import { Trophy, Star, Settings, LogOut, Plus } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import Link from 'next/link';
 
 export const revalidate = 0;
 
-export default async function ProfilPage() {
-  // 1. Bebek Bilgisi
-  const { data: bebekler } = await supabase.from('bebekler').select('*').limit(1);
-  const bebek = bebekler?.[0];
+// --- SERVER ACTION: ÇIKIŞ YAP ---
+async function cikisYap() {
+  'use server'
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect('/login');
+}
 
-  // 2. Toplam İstatistikler (Gamification)
-  const { count: mamaSayisi } = await supabase.from('aktiviteler').select('*', { count: 'exact', head: true }).eq('tip', 'mama');
-  const { count: bezSayisi } = await supabase.from('aktiviteler').select('*', { count: 'exact', head: true }).eq('tip', 'bez');
-  const { count: uykuSayisi } = await supabase.from('aktiviteler').select('*', { count: 'exact', head: true }).eq('tip', 'uyku');
+export default async function ProfilPage() {
+  // 1. Çerezden Seçili Bebeği Al
+  const cookieStore = await cookies();
+  const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
+
+  // 2. Tüm Bebekleri Getir
+  const { data: bebekler } = await supabase.from('bebekler').select('*').order('id');
+  
+  // 3. Aktif Bebeği Belirle
+  // Eğer seçili ID listede varsa onu kullan, yoksa ilkini kullan
+  const aktifId = (seciliId && bebekler?.find(b => b.id === seciliId)) ? seciliId : bebekler?.[0]?.id;
+  const seciliBebek = bebekler?.find(b => b.id === aktifId) || bebekler?.[0];
+
+  // 4. İstatistikler (Sadece Aktif Bebek İçin)
+  const { count: mamaSayisi } = await supabase.from('aktiviteler').select('*', { count: 'exact', head: true }).eq('bebek_id', aktifId).eq('tip', 'mama');
+  const { count: bezSayisi } = await supabase.from('aktiviteler').select('*', { count: 'exact', head: true }).eq('bebek_id', aktifId).eq('tip', 'bez');
+  const { count: uykuSayisi } = await supabase.from('aktiviteler').select('*', { count: 'exact', head: true }).eq('bebek_id', aktifId).eq('tip', 'uyku');
   const { count: ilanSayisi } = await supabase.from('urunler').select('*', { count: 'exact', head: true });
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
         
-        {/* Üst Arka Plan (Dekoratif) */}
-        <div className="bg-blue-600 h-40 rounded-b-[3rem] relative"></div>
+        {/* Üst Arka Plan */}
+        <div className="bg-blue-600 h-48 rounded-b-[3rem] relative"></div>
 
-        <div className="px-6 -mt-28 relative z-10">
+        <div className="px-6 -mt-36 relative z-10">
             
-            {/* KART 1: Bebek Künyesi */}
-            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
-                <ProfilForm bebek={bebek} />
+            {/* Bebek Listesi Başlığı ve Ekle Butonu */}
+            <div className="flex items-center justify-between mb-3 text-white/90 px-1">
+                <h3 className="font-bold text-sm">Bebeklerim</h3>
+                <Link href="/profil/ekle" className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full font-bold flex items-center gap-1 transition-colors backdrop-blur-sm border border-white/10">
+                    <Plus className="w-3 h-3" /> Yeni Ekle
+                </Link>
             </div>
 
-            {/* KART 2: İstatistikler (Rozetler) */}
+            {/* Yatay Bebek Listesi */}
+            <div className="flex gap-3 overflow-x-auto pb-4 mb-2 scrollbar-hide">
+                {bebekler?.map((b) => (
+                    <div key={b.id} className={`min-w-[100px] p-3 rounded-2xl flex flex-col items-center transition-all border-2 ${b.id === aktifId ? 'bg-white border-blue-400 shadow-lg scale-105' : 'bg-white/80 border-transparent shadow-sm'}`}>
+                        <div className="w-12 h-12 rounded-full overflow-hidden mb-2 bg-gray-100 border border-gray-200">
+                            {b.resim_url ? (
+                                <img src={b.resim_url} className="w-full h-full object-cover" alt={b.ad} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-lg">{b.ad.charAt(0)}</div>
+                            )}
+                        </div>
+                        <p className="font-bold text-xs text-gray-800 truncate w-full text-center">{b.ad}</p>
+                    </div>
+                ))}
+                {(!bebekler || bebekler.length === 0) && (
+                    <div className="text-white text-xs p-2">Henüz bebek eklenmedi.</div>
+                )}
+            </div>
+            
+            {/* KART 1: Bebek Künyesi (Düzenlenebilir Form) */}
+            {seciliBebek ? (
+                <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 border border-gray-100">
+                    <ProfilForm bebek={seciliBebek} />
+                </div>
+            ) : null}
+
+            {/* KART 2: İstatistikler */}
             <div className="mb-6">
                 <h3 className="text-gray-800 font-bold text-sm mb-3 ml-2 flex items-center gap-2">
                     <Trophy className="w-4 h-4 text-yellow-500" />
-                    Başarı İstatistikleri
+                    {seciliBebek?.ad || 'Bebek'} İstatistikleri
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                     <StatCard label="Bez Değişimi" value={bezSayisi || 0} color="bg-blue-50 text-blue-600" />
@@ -42,16 +91,23 @@ export default async function ProfilPage() {
                 </div>
             </div>
 
-            {/* KART 3: Ayarlar Menüsü (Görsel) */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            {/* KART 3: Menü ve Çıkış */}
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
                 <MenuItem icon={Star} label="Premium'a Geç" />
                 <MenuItem icon={Settings} label="Uygulama Ayarları" />
                 <div className="border-t border-gray-100"></div>
-                <MenuItem icon={LogOut} label="Çıkış Yap" isRed />
+                
+                {/* Çıkış Yap Formu */}
+                <form action={cikisYap}>
+                    <button className="w-full p-4 flex items-center gap-3 text-sm font-bold hover:bg-gray-50 transition-colors text-red-500">
+                        <LogOut className="w-5 h-5" />
+                        Çıkış Yap
+                    </button>
+                </form>
             </div>
 
-            <p className="text-center text-[10px] text-gray-400 mt-6">
-                Ezel Bebek v1.0.0
+            <p className="text-center text-[10px] text-gray-400 mt-8 mb-4">
+                Ezel Bebek v1.2.0
             </p>
 
         </div>
