@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import OneSignalInit from "@/components/OneSignalInit"; // YENİ
 
 const inter = Inter({ subsets: ["latin"] });
 
-// 1. PWA VE MOBİL AYARLARI
 export const metadata: Metadata = {
   title: "Ezel Bebek",
   description: "Bebek Gelişim, Takip ve Takas Platformu",
@@ -14,10 +14,11 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "Ezel Bebek",
+    startupImage: [],
   },
   icons: {
-    icon: "/icon.png",  // ARTIK STANDART
-    apple: "/icon.png", // ARTIK STANDART
+    icon: "/icon.png", 
+    apple: "/icon.png", 
   },
 };
 
@@ -37,6 +38,10 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className={`${inter.className} bg-gray-50`}>
+        
+        {/* BİLDİRİM SİSTEMİNİ BAŞLAT */}
+        <OneSignalInit />
+
         <div className="max-w-md mx-auto min-h-screen bg-white shadow-md relative pb-24">
            {children}
         </div>
