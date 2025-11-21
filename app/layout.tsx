@@ -5,7 +5,7 @@ import BottomNav from "@/components/BottomNav";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// 1. PWA VE MOBİL AYARLARI (Metadata)
+// 1. PWA VE MOBİL AYARLARI
 export const metadata: Metadata = {
   title: "Ezel Bebek",
   description: "Bebek Gelişim, Takip ve Takas Platformu",
@@ -14,22 +14,18 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "Ezel Bebek",
-    startupImage: [],
   },
   icons: {
-    // DÜZELTME: Klasöründeki gerçek dosya ismini yazdık
-    icon: "/icon-192x192.png", 
-    apple: "/icon-192x192.png", 
+    icon: "/icon.png",  // ARTIK STANDART
+    apple: "/icon.png", // ARTIK STANDART
   },
 };
 
-// 2. EKRAN AYARLARI (Viewport)
-// Bu ayar, mobilde inputlara tıklayınca ekranın zoom yapmasını engeller
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Zoom'u engeller (Native hissi için önemli)
+  userScalable: false,
   themeColor: "#2563eb",
 };
 
@@ -41,15 +37,10 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className={`${inter.className} bg-gray-50`}>
-        
-        {/* İçerik Alanı */}
         <div className="max-w-md mx-auto min-h-screen bg-white shadow-md relative pb-24">
            {children}
         </div>
-
-        {/* Alt Menü Bileşeni */}
         <BottomNav />
-
       </body>
     </html>
   );
