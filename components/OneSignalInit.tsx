@@ -9,39 +9,15 @@ export default function OneSignalInit() {
       const runOneSignal = async () => {
         try {
           await OneSignal.init({
-            appId: "3d11c397-1c73-4949-a1e9-5f9d206d7218",
-            
-            // --- DÜZELTME BURADA ---
-            // Başlarına / koyduk ki her yerden bulabilsin
-            serviceWorkerPath: "/OneSignalSDKWorker.js", 
-            serviceWorkerParam: { scope: "/" },
-            // -----------------------
-
+            appId: "3d11c397-1c73-4949-a1e9-5f9d206d7218", // ID'n burada
+            allowLocalhostAsSecureOrigin: true,
             notifyButton: {
-              enable: true, 
+              enable: true,
             },
-            promptOptions: {
-              slidedown: {
-                prompts: [
-                  {
-                    type: "push",
-                    autoPrompt: true,
-                    text: {
-                      actionMessage: "Aşı ve ilaç hatırlatmaları için bildirimleri açmak ister misin?",
-                      acceptButton: "Evet, Aç",
-                      cancelButton: "Hayır",
-                    },
-                    delay: {
-                      pageViews: 1,
-                      timeDelay: 5, 
-                    },
-                  },
-                ],
-              },
-            },
+            // Otomatik dosya yolu bulmaya bırakalım
           });
         } catch (error) {
-          console.error("OneSignal Hatası:", error);
+          console.error("OneSignal Başlatma Hatası:", error);
         }
       };
 
