@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
-import { ChevronLeft, ChevronRight, Syringe, Thermometer, ChevronRight as ChevronRightIcon } from 'lucide-react'; // İkonlar eklendi
+import { ChevronLeft, ChevronRight, Syringe, Thermometer, Star, ChevronRight as ChevronRightIcon } from 'lucide-react'; // Star ikonu eklendi
 import GunlukNot from '@/components/GunlukNot';
 import TarihSecici from '@/components/TarihSecici';
 import Link from 'next/link';
@@ -8,7 +8,6 @@ import { cookies } from 'next/headers';
 export const revalidate = 0;
 
 export default async function GelisimPage({ searchParams }: { searchParams: Promise<{ tarih?: string }> }) {
-  // 1. Tarih ve Bebek Bilgilerini Al
   const params = await searchParams;
   const bugun = new Date().toISOString().split('T')[0];
   const secilenTarih = params.tarih || bugun;
@@ -24,7 +23,7 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
   const oncekiLink = `/gelisim?tarih=${oncekiGun.toISOString().split('T')[0]}`;
   const sonrakiLink = `/gelisim?tarih=${sonrakiGun.toISOString().split('T')[0]}`;
 
-  // 2. Verileri Çek (SADECE SEÇİLİ BEBEK İÇİN)
+  // Verileri Çek
   const { data: aktiviteler } = await supabase
     .from('aktiviteler')
     .select('*')
@@ -81,7 +80,7 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
                     </div>
                 </Link>
 
-                {/* 2. ATEŞ TAKİBİ (KIRMIZI) - İŞTE BU EKSİKTİ */}
+                {/* 2. ATEŞ TAKİBİ (KIRMIZI) */}
                 <Link href="/saglik/ates">
                     <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-red-200 active:scale-95 transition-transform cursor-pointer">
                         <div className="flex items-center gap-3">
@@ -91,6 +90,22 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
                             <div>
                                 <h3 className="font-bold text-md">Ateş Takibi</h3>
                                 <p className="text-xs text-red-100 opacity-90">Derece ve ilaç kaydı</p>
+                            </div>
+                        </div>
+                        <ChevronRightIcon className="w-5 h-5 text-white/80" />
+                    </div>
+                </Link>
+
+                {/* 3. YILDIZ REHBERİ (MOR - YENİ EKLENDİ) */}
+                <Link href="/astroloji">
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-indigo-200 active:scale-95 transition-transform cursor-pointer">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white/20 p-2 rounded-full border border-white/30">
+                                <Star className="w-6 h-6 text-yellow-300 fill-yellow-300" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-md">Yıldız Rehberi</h3>
+                                <p className="text-xs text-indigo-200 opacity-90">Günlük burç yorumu</p>
                             </div>
                         </div>
                         <ChevronRightIcon className="w-5 h-5 text-white/80" />
