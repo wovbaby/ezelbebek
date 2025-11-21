@@ -139,3 +139,23 @@ export default async function GelisimPage({ searchParams }: { searchParams: Prom
     </main>
   );
 }
+// importlara Thermometer ekle
+import { Thermometer } from 'lucide-react';
+
+// ... (Aşı Takvimi Link'inin hemen altına yapıştır)
+
+{/* ATEŞ TAKİBİ BUTONU */}
+<Link href="/saglik/ates">
+    <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-red-200 active:scale-95 transition-transform cursor-pointer mb-6 mt-2">
+        <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-full border border-white/30">
+                <Thermometer className="w-6 h-6 text-white" />
+            </div>
+            <div>
+                <h3 className="font-bold text-md">Ateş Takibi</h3>
+                <p className="text-xs text-red-100 opacity-90">Derece ve ilaç kaydı</p>
+            </div>
+        </div>
+        <ChevronRight className="w-5 h-5 text-white/80" />
+    </div>
+</Link>

@@ -216,3 +216,29 @@ export async function anneGuncelle(formData: FormData) {
   revalidatePath('/anne');
   return true;
 }
+// 11. ATEŞ KAYDI EKLEME
+export async function atesEkle(formData: FormData) {
+  const bebekId = await getSeciliBebekId();
+  const derece = formData.get('derece') as string;
+  const olcum_yeri = formData.get('olcum_yeri') as string;
+  const ilac = formData.get('ilac') as string;
+  const notlar = formData.get('notlar') as string;
+
+  const { error } = await supabase
+    .from('ates_takibi')
+    .insert([{ 
+      bebek_id: bebekId, 
+      derece: parseFloat(derece), 
+      olcum_yeri, 
+      ilac, 
+      notlar 
+    }]);
+
+  if (error) {
+    console.error('Ateş ekleme hatası:', error);
+    return false;
+  }
+
+  revalidatePath('/saglik/ates'); // Birazdan bu sayfayı yapacağız
+  return true;
+}
