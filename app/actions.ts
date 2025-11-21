@@ -306,8 +306,6 @@ export async function asiIsaretle(asiId: number, yapildi: boolean) {
   revalidatePath('/asi-takvimi'); // Sayfayı yenile
   return true;
 }
-// ... (önceki kodların altına)
-
 // 8. ANNE - Su İçme
 export async function suIc() {
   // Önce mevcut sayıyı al
