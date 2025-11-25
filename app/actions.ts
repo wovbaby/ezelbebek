@@ -1,6 +1,6 @@
 'use server'
 
-import { supabase } from "@/lib/supabaseClient";
+import { createServerClient } from '@supabase/ssr'
 import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
@@ -13,11 +13,33 @@ cloudinary.config({
   secure: true,
 });
 
+// --- YARDIMCI: SUPABASE CLIENT OLUŞTURUCU (HER İŞLEM İÇİN) ---
+// Bu fonksiyon her server action'da çağrılarak oturum bilgisini korur.
+async function getSupabaseClient() {
+    const cookieStore = await cookies();
+    return createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() { return cookieStore.getAll() },
+                setAll(cookiesToSet) {
+                    try {
+                        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+                    } catch {
+                        // Server Action içinde cookie set edilebilir, hata yok sayılır
+                    }
+                },
+            },
+        }
+    );
+}
+
 // --- YARDIMCI: SEÇİLİ BEBEK ID'SİNİ BUL ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
-  return seciliId ? parseInt(seciliId) : 1; 
+  return seciliId ? parseInt(seciliId) : 0; 
 }
 
 // --- BEBEK DEĞİŞTİRME ---
@@ -29,32 +51,52 @@ export async function bebekSec(bebekId: number) {
 
 // 1. AKTİVİTE EKLEME
 export async function aktiviteEkle(tip: string, detay: string) {
+  const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
+  
+  if (!bebekId) return false;
+
   const { error } = await supabase.from('aktiviteler').insert([{ bebek_id: bebekId, tip, detay }]);
   if (error) return false;
+  
   revalidatePath('/');
   return true;
 }
 
 // 2. GÜNLÜK NOT
 export async function notKaydet(tarih: string, icerik: string) {
+  const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
+
+  if (!bebekId) return false;
+
   const { error } = await supabase.from('gunluk_notlar').upsert({ bebek_id: bebekId, tarih, icerik }, { onConflict: 'bebek_id, tarih' });
   if (error) return false;
+  
   revalidatePath('/gelisim');
   return true;
 }
 
 // 3. FORUM KONUSU
 export async function konuEkle(baslik: string, icerik: string, kategori: string) {
-  const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: 'Anonim Anne' }]);
+  const supabase = await getSupabaseClient();
+  
+  // Yazar adını giriş yapan kullanıcıdan alabiliriz (Opsiyonel)
+  const { data: { user } } = await supabase.auth.getUser();
+  const yazarAdi = user?.email?.split('@')[0] || 'Anonim Anne';
+
+  const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: yazarAdi, user_id: user?.id }]);
   if (error) return false;
+  
   revalidatePath('/forum');
   return true;
 }
 
 // 4. TAKAS İLANI (Resimli + İlçeli)
 export async function ilanEkle(formData: FormData) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   const baslik = formData.get('baslik') as string;
   const fiyat = formData.get('fiyat') as string;
   const kategori = formData.get('kategori') as string;
@@ -79,7 +121,13 @@ export async function ilanEkle(formData: FormData) {
     } catch (error) { console.error("Resim hatası:", error); }
   }
 
-  const { error } = await supabase.from('urunler').insert([{ baslik, fiyat, kategori, sehir, ilce, durum, resim_url: resimUrl, iletisim: '0555-XXX-XX-XX' }]);
+  const { error } = await supabase.from('urunler').insert([{ 
+      baslik, fiyat, kategori, sehir, ilce, durum, 
+      resim_url: resimUrl, 
+      iletisim: '0555-XXX-XX-XX',
+      user_id: user?.id // İlan sahibini kaydet
+  }]);
+
   if (error) return false;
   revalidatePath('/takas');
   return true;
@@ -87,7 +135,11 @@ export async function ilanEkle(formData: FormData) {
 
 // 5. BEBEK PROFİL GÜNCELLEME (Resimli)
 export async function profilGuncelle(formData: FormData) {
+  const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
+  
+  if (!bebekId) return false;
+
   const ad = formData.get('ad') as string;
   const dogum_tarihi = formData.get('dogum_tarihi') as string;
   const cinsiyet = formData.get('cinsiyet') as string;
@@ -119,8 +171,14 @@ export async function profilGuncelle(formData: FormData) {
   return true;
 }
 
-// 6. YENİ BEBEK EKLEME
+// 6. YENİ BEBEK EKLEME (Kişisel ID ile)
 export async function yeniBebekEkle(formData: FormData) {
+  const supabase = await getSupabaseClient();
+  
+  // Kullanıcıyı bul
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false; // Giriş yapmamışsa ekleme
+
   const ad = formData.get('ad') as string;
   const dogum_tarihi = formData.get('dogum_tarihi') as string;
   const cinsiyet = formData.get('cinsiyet') as string;
@@ -143,15 +201,34 @@ export async function yeniBebekEkle(formData: FormData) {
     } catch (error) { console.error("Yeni bebek resim hatası:", error); }
   }
 
-  const { error } = await supabase.from('bebekler').insert([{ ad, dogum_tarihi, cinsiyet, boy: parseFloat(boy)||0, kilo: parseFloat(kilo)||0, resim_url: resimUrl }]);
-  if (error) return false;
+  // user_id EKLENDİ!
+  const { error } = await supabase.from('bebekler').insert([{ 
+      ad, 
+      dogum_tarihi, 
+      cinsiyet, 
+      boy: parseFloat(boy)||0, 
+      kilo: parseFloat(kilo)||0, 
+      resim_url: resimUrl,
+      user_id: user.id 
+  }]);
+
+  if (error) {
+      console.error("Bebek ekleme db hatası:", error);
+      return false;
+  }
+  
   revalidatePath('/profil');
+  revalidatePath('/'); // Ana sayfayı da yenile ki bebek görünsün
   return true;
 }
 
 // 7. AŞI İŞARETLEME
 export async function asiIsaretle(asiId: number, yapildi: boolean) {
+  const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
+  
+  if (!bebekId) return false;
+
   if (yapildi) {
     const { error } = await supabase.from('asi_durumu').insert([{ bebek_id: bebekId, asi_id: asiId, yapildi_mi: true, yapilma_tarihi: new Date().toISOString() }]);
     if (error) console.error('Aşı hata:', error);
@@ -165,9 +242,14 @@ export async function asiIsaretle(asiId: number, yapildi: boolean) {
 
 // 8. ANNE - SU İÇME
 export async function suIc() {
-  const { data } = await supabase.from('anne_profili').select('icilen_su').single();
+  const supabase = await getSupabaseClient();
+  // Not: Anne profilini kişiselleştirmek için burada da user_id kullanabilirsin.
+  // Şimdilik id=1 olarak bıraktım, anne_profili tablonu güncelleyince burayı user.id yapmalıyız.
+  const { data } = await supabase.from('anne_profili').select('icilen_su').eq('id', 1).single();
+  
   const yeniSayi = (data?.icilen_su || 0) + 1;
   const { error } = await supabase.from('anne_profili').update({ icilen_su: yeniSayi }).eq('id', 1);
+  
   if (error) return false;
   revalidatePath('/anne');
   return true;
@@ -175,6 +257,7 @@ export async function suIc() {
 
 // 9. ANNE - SU SIFIRLA
 export async function suSifirla() {
+  const supabase = await getSupabaseClient();
   const { error } = await supabase.from('anne_profili').update({ icilen_su: 0 }).eq('id', 1);
   revalidatePath('/anne');
   return true;
@@ -182,6 +265,8 @@ export async function suSifirla() {
 
 // 10. ANNE - GÜNCELLEME (Resimli)
 export async function anneGuncelle(formData: FormData) {
+  const supabase = await getSupabaseClient();
+  
   const son_adet_tarihi = formData.get('son_adet_tarihi') as string;
   const dongu_suresi = formData.get('dongu_suresi') as string;
   const su_hedefi = formData.get('su_hedefi') as string;
@@ -216,9 +301,14 @@ export async function anneGuncelle(formData: FormData) {
   revalidatePath('/anne');
   return true;
 }
+
 // 11. ATEŞ KAYDI EKLEME
 export async function atesEkle(formData: FormData) {
+  const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
+  
+  if (!bebekId) return false;
+
   const derece = formData.get('derece') as string;
   const olcum_yeri = formData.get('olcum_yeri') as string;
   const ilac = formData.get('ilac') as string;
@@ -239,14 +329,14 @@ export async function atesEkle(formData: FormData) {
     return false;
   }
 
-  revalidatePath('/saglik/ates'); // Birazdan bu sayfayı yapacağız
+  revalidatePath('/saglik/ates');
   return true;
 }
-// ... (önceki kodların en altı)
 
-// 11. ANNE - SPOR (Kalori Ekle)
+// 12. ANNE - SPOR (Kalori Ekle)
 export async function kaloriEkle(miktar: number) {
-  const { data } = await supabase.from('anne_profili').select('yakilan_kalori').single();
+  const supabase = await getSupabaseClient();
+  const { data } = await supabase.from('anne_profili').select('yakilan_kalori').eq('id', 1).single();
   const yeniKalori = (data?.yakilan_kalori || 0) + miktar;
 
   const { error } = await supabase
@@ -255,6 +345,6 @@ export async function kaloriEkle(miktar: number) {
     .eq('id', 1);
 
   if (error) return false;
-  revalidatePath('/anne'); // Anne sayfasını yenile
+  revalidatePath('/anne'); 
   return true;
 }

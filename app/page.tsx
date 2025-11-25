@@ -1,26 +1,66 @@
-import { supabase } from '@/lib/supabaseClient';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { Baby, Utensils, Moon, Wind } from 'lucide-react';
 import HizliIslem from '@/components/HizliIslem';
 import BebekSecici from '@/components/BebekSecici';
-import { cookies } from 'next/headers';
 
+// Sayfanın her istekte yenilenmesini sağla (Dinamik Veri)
 export const revalidate = 0;
 
 export default async function Home() {
-  // 1. Verileri Çek
-  const cookieStore = await cookies();
-  const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
-  const { data: tumBebekler } = await supabase.from('bebekler').select('id, ad, resim_url');
-  
-  const aktifId = (seciliId && tumBebekler?.find(b => b.id === seciliId)) ? seciliId : tumBebekler?.[0]?.id;
-  const seciliBebek = tumBebekler?.find(b => b.id === aktifId);
+  const cookieStore = cookies();
 
-  const { data: aktiviteler } = await supabase
-    .from('aktiviteler')
-    .select('*')
-    .eq('bebek_id', aktifId)
-    .order('created_at', { ascending: false })
-    .limit(20);
+  // 1. Sunucu Tarafı Supabase İstemcisi Oluştur
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+           // Server Component içinde cookie set edilemez ama okuma için gereklidir
+           try {
+             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+           } catch {
+             // Server component set hatasını yoksay
+           }
+        },
+      },
+    }
+  );
+
+  // 2. Giriş Yapan Kullanıcıyı Bul
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 3. SADECE Bu Kullanıcıya Ait Bebekleri Getir (.eq('user_id', user.id))
+  // Eğer kullanıcı yoksa boş dizi döner
+  let tumBebekler = [];
+  if (user) {
+    const { data } = await supabase
+      .from('bebekler')
+      .select('id, ad, resim_url')
+      .eq('user_id', user.id); // <-- İŞTE SİHİRLİ SATIR
+    tumBebekler = data || [];
+  }
+
+  // 4. Seçili Bebeği Belirle
+  const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
+  const aktifId = (seciliId && tumBebekler.find(b => b.id === seciliId)) ? seciliId : tumBebekler[0]?.id;
+  const seciliBebek = tumBebekler.find(b => b.id === aktifId);
+
+  // 5. Aktiviteleri Getir (Eğer bebek seçiliyse)
+  let aktiviteler = [];
+  if (aktifId) {
+    const { data } = await supabase
+      .from('aktiviteler')
+      .select('*')
+      .eq('bebek_id', aktifId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    aktiviteler = data || [];
+  }
 
   return (
     <main className="h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -49,13 +89,13 @@ export default async function Home() {
             
             {/* BEBEK SEÇİCİ - SOL ÜSTTE */}
             <div className="self-start"> 
-                 <BebekSecici bebekler={tumBebekler || []} seciliId={aktifId} />
+                 <BebekSecici bebekler={tumBebekler} seciliId={aktifId} />
             </div>
 
             {/* İSİM - ORTADA ALTTA */}
             <div className="text-center text-white mb-2">
                 <h2 className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">Hoş Geldin</h2>
-                <h1 className="text-4xl font-bold tracking-tight drop-shadow-md">{seciliBebek?.ad || "Bebek"}</h1>
+                <h1 className="text-4xl font-bold tracking-tight drop-shadow-md">{seciliBebek?.ad || "Bebek Ekle"}</h1>
             </div>
         </div>
       </header>
@@ -64,14 +104,13 @@ export default async function Home() {
       <div className="flex-1 overflow-y-auto relative z-30 scrollbar-hide">
         
         {/* HIZLI İŞLEM (YAPIŞKAN / STICKY) */}
-        {/* sticky top-0: Sayfa kayınca tepeye yapışır */}
-        {/* z-50: Logların üstünde dursun */}
-        {/* backdrop-blur: Arkasından geçen yazılar bulanıklaşsın (buzlu cam efekti) */}
-        <div className="sticky top-0 z-50 px-5 pt-6 pb-2 bg-gray-50/95 backdrop-blur-sm transition-all">
-            <div className="origin-top"> 
-                <HizliIslem />
-            </div>
-        </div>
+        {seciliBebek && (
+          <div className="sticky top-0 z-50 px-5 pt-6 pb-2 bg-gray-50/95 backdrop-blur-sm transition-all">
+              <div className="origin-top"> 
+                  <HizliIslem />
+              </div>
+          </div>
+        )}
 
         {/* CANLI LOG LİSTESİ */}
         <div className="px-6 pb-32 mt-2">
@@ -80,7 +119,7 @@ export default async function Home() {
             </h3>
             
             <div className="space-y-2.5">
-                {aktiviteler?.map((islem) => {
+                {aktiviteler.map((islem) => {
                     let Icon = Baby;
                     let colorClass = "bg-gray-100 text-gray-600";
                     
@@ -108,10 +147,12 @@ export default async function Home() {
                     );
                 })}
                 
-                {(!aktiviteler || aktiviteler.length === 0) && (
+                {aktiviteler.length === 0 && (
                     <div className="text-center py-12 opacity-50">
                         <Baby className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                        <p className="text-gray-400 text-sm">Henüz kayıt yok.</p>
+                        <p className="text-gray-400 text-sm">
+                           {seciliBebek ? "Henüz kayıt yok." : "Lütfen bir bebek ekleyin."}
+                        </p>
                     </div>
                 )}
             </div>

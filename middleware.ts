@@ -2,14 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Yanıt nesnesini oluştur
+  // 1. Yanıt nesnesini oluştur
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
 
-  // Supabase Client'ı oluştur (Cookie okumak için)
+  // 2. Supabase Client'ı oluştur (Cookie yönetimi ile)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,19 +31,19 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Kullanıcıyı kontrol et
+  // 3. Kullanıcıyı kontrol et
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   // --- YÖNLENDİRME KURALLARI ---
 
-  // 1. Eğer kullanıcı GİRİŞ YAPMAMIŞSA ve Login sayfasında DEĞİLSE -> Login'e at
+  // A. Kullanıcı YOKSA ve Login sayfasında DEĞİLSE -> Login'e at
   if (!user && !request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // 2. Eğer kullanıcı GİRİŞ YAPMIŞSA ve Login sayfasındaysa -> Ana sayfaya at
+  // B. Kullanıcı VARSA ve Login sayfasındaysa -> Ana sayfaya at
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/', request.url))
   }
@@ -51,7 +51,6 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
-// Middleware hangi sayfalarda çalışsın?
 export const config = {
   matcher: [
     /*
