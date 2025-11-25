@@ -8,7 +8,7 @@ import BebekSecici from '@/components/BebekSecici';
 export const revalidate = 0;
 
 export default async function Home() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   // 1. Sunucu Tarafı Supabase İstemcisi Oluştur
   const supabase = createServerClient(
