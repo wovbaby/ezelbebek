@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- 1. CLOUDINARY AYARLARI ---
+// --- CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -13,7 +13,7 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 2. YARDIMCI: SUPABASE CLIENT ---
+// --- YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,7 +32,7 @@ async function getSupabaseClient() {
     );
 }
 
-// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
+// --- DİĞER YARDIMCILAR ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
@@ -40,7 +40,74 @@ async function getSeciliBebekId() {
 }
 
 // ==========================================
-//              BEBEK İŞLEMLERİ
+//              MARKET İŞLEMLERİ (GÜNCELLENDİ)
+// ==========================================
+
+export async function ilanEkle(formData: FormData) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+      return { success: false, error: "Oturum açmanız gerekiyor." };
+  }
+
+  const baslik = formData.get('baslik') as string;
+  const fiyat = parseFloat(formData.get('fiyat') as string); // Sayıya çevir
+  const kategori = formData.get('kategori') as string;
+  const sehir = formData.get('sehir') as string;
+  const ilce = formData.get('ilce') as string;
+  const durum = formData.get('durum') as string;
+  const iletisim = formData.get('iletisim') as string;
+  
+  // Resim URL kontrolü
+  const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
+
+  // Basit doğrulama
+  if (!baslik || isNaN(fiyat) || !sehir) {
+      return { success: false, error: "Lütfen zorunlu alanları doldurun." };
+  }
+
+  const { error } = await supabase.from('urunler').insert([{ 
+      baslik, 
+      fiyat, 
+      kategori, 
+      sehir, 
+      ilce, 
+      durum, 
+      resim_url: resimUrl, 
+      iletisim: iletisim || 'Belirtilmedi',
+      user_id: user.id
+  }]);
+
+  if (error) {
+      console.error("İlan ekleme hatası:", error);
+      return { success: false, error: error.message };
+  }
+
+  revalidatePath('/takas');
+  return { success: true };
+}
+
+// --- CLOUDINARY İMZA ---
+export async function getCloudinarySignature() {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Giriş yapmalısın");
+
+  const timestamp = Math.round(new Date().getTime() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    {
+      timestamp: timestamp,
+      folder: 'bebek-pwa-urunler',
+    },
+    process.env.CLOUDINARY_API_SECRET!
+  );
+
+  return { timestamp, signature };
+}
+
+// ==========================================
+//              DİĞER İŞLEMLER (AYNI)
 // ==========================================
 
 export async function bebekSec(bebekId: number) {
@@ -57,8 +124,8 @@ export async function yeniBebekEkle(formData: FormData) {
   const ad = formData.get('ad') as string;
   const dogum_tarihi = formData.get('dogum_tarihi') as string;
   const cinsiyet = formData.get('cinsiyet') as string;
-  const boy = formData.get('boy') as string;
-  const kilo = formData.get('kilo') as string;
+  const boy = parseFloat(formData.get('boy') as string) || 0;
+  const kilo = parseFloat(formData.get('kilo') as string) || 0;
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
@@ -76,13 +143,7 @@ export async function yeniBebekEkle(formData: FormData) {
     } catch (error) { console.error("Bebek resim hatası:", error); }
   }
 
-  const { error } = await supabase.from('bebekler').insert([{ 
-      ad, dogum_tarihi, cinsiyet, 
-      boy: parseFloat(boy)||0, kilo: parseFloat(kilo)||0, 
-      resim_url: resimUrl,
-      user_id: user.id 
-  }]);
-
+  const { error } = await supabase.from('bebekler').insert([{ ad, dogum_tarihi, cinsiyet, boy, kilo, resim_url: resimUrl, user_id: user.id }]);
   if (error) return false;
   revalidatePath('/profil'); revalidatePath('/');
   return true;
@@ -96,8 +157,8 @@ export async function profilGuncelle(formData: FormData) {
   const ad = formData.get('ad') as string;
   const dogum_tarihi = formData.get('dogum_tarihi') as string;
   const cinsiyet = formData.get('cinsiyet') as string;
-  const boy = formData.get('boy') as string;
-  const kilo = formData.get('kilo') as string;
+  const boy = parseFloat(formData.get('boy') as string) || 0;
+  const kilo = parseFloat(formData.get('kilo') as string) || 0;
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
@@ -115,7 +176,7 @@ export async function profilGuncelle(formData: FormData) {
     } catch (error) { console.error("Profil resim hatası:", error); }
   }
 
-  const guncellenecekVeri: any = { ad, dogum_tarihi, cinsiyet, boy: parseFloat(boy), kilo: parseFloat(kilo) };
+  const guncellenecekVeri: any = { ad, dogum_tarihi, cinsiyet, boy, kilo };
   if (resimUrl) guncellenecekVeri.resim_url = resimUrl;
 
   const { error } = await supabase.from('bebekler').update(guncellenecekVeri).eq('id', bebekId);
@@ -124,6 +185,7 @@ export async function profilGuncelle(formData: FormData) {
   return true;
 }
 
+// --- Günlük Takip ---
 export async function aktiviteEkle(tip: string, detay: string) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
@@ -161,26 +223,25 @@ export async function atesEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
   if (!bebekId) return false;
-  const derece = formData.get('derece') as string;
+  const derece = parseFloat(formData.get('derece') as string) || 0;
   const olcum_yeri = formData.get('olcum_yeri') as string;
   const ilac = formData.get('ilac') as string;
   const notlar = formData.get('notlar') as string;
-  const { error } = await supabase.from('ates_takibi').insert([{ 
-      bebek_id: bebekId, derece: parseFloat(derece), olcum_yeri, ilac, notlar 
-  }]);
+  const { error } = await supabase.from('ates_takibi').insert([{ bebek_id: bebekId, derece, olcum_yeri, ilac, notlar }]);
   if (error) return false;
   revalidatePath('/saglik/ates');
   return true;
 }
 
+// --- Anne Profili ---
 export async function anneGuncelle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
 
   const son_adet_tarihi = formData.get('son_adet_tarihi') as string;
-  const dongu_suresi = formData.get('dongu_suresi') as string;
-  const su_hedefi = formData.get('su_hedefi') as string;
+  const dongu_suresi = parseInt(formData.get('dongu_suresi') as string) || 28;
+  const su_hedefi = parseInt(formData.get('su_hedefi') as string) || 2000;
   const ad = formData.get('ad') as string;
   const resimDosyasi = formData.get('resim') as File;
   
@@ -202,8 +263,8 @@ export async function anneGuncelle(formData: FormData) {
   const veri: any = { user_id: user.id }; 
   if (ad) veri.ad = ad;
   if (son_adet_tarihi) veri.son_adet_tarihi = son_adet_tarihi;
-  if (dongu_suresi) veri.dongu_suresi = parseInt(dongu_suresi);
-  if (su_hedefi) veri.su_hedefi = parseInt(su_hedefi);
+  if (dongu_suresi) veri.dongu_suresi = dongu_suresi;
+  if (su_hedefi) veri.su_hedefi = su_hedefi;
   if (resimUrl) veri.resim_url = resimUrl;
   
   const { error } = await supabase.from('anne_profili').upsert(veri, { onConflict: 'user_id' });
@@ -216,10 +277,8 @@ export async function suIc() {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
   const { data } = await supabase.from('anne_profili').select('icilen_su').eq('user_id', user.id).single();
   const yeniSayi = (data?.icilen_su || 0) + 1;
-  
   const { error } = await supabase.from('anne_profili').upsert({ user_id: user.id, icilen_su: yeniSayi }, { onConflict: 'user_id' });
   if (error) return false;
   revalidatePath('/anne'); revalidatePath('/profil');
@@ -230,7 +289,6 @@ export async function suSifirla() {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
   const { error } = await supabase.from('anne_profili').update({ icilen_su: 0 }).eq('user_id', user.id);
   revalidatePath('/anne'); revalidatePath('/profil');
   return true;
@@ -240,10 +298,8 @@ export async function kaloriEkle(miktar: number) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
   const { data } = await supabase.from('anne_profili').select('yakilan_kalori').eq('user_id', user.id).single();
   const yeniKalori = (data?.yakilan_kalori || 0) + miktar;
-
   const { error } = await supabase.from('anne_profili').upsert({ user_id: user.id, yakilan_kalori: yeniKalori }, { onConflict: 'user_id' });
   if (error) return false;
   revalidatePath('/anne'); revalidatePath('/profil');
@@ -260,71 +316,12 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   return true;
 }
 
-// ============================================================
-// 🚀 MARKET & MEDYA (DIRECT UPLOAD SİSTEMİNE GÜNCELLENDİ)
-// ============================================================
-
-// --- TAKAS İLANI EKLE (GÜNCELLENDİ: Resim URL'ini frontend'den alır) ---
-export async function ilanEkle(formData: FormData) {
-  const supabase = await getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const baslik = formData.get('baslik') as string;
-  const fiyat = formData.get('fiyat') as string;
-  const kategori = formData.get('kategori') as string;
-  const sehir = formData.get('sehir') as string;
-  const ilce = formData.get('ilce') as string;
-  const durum = formData.get('durum') as string;
-  
-  // ARTIK DOSYA DEĞİL, URL ALIYORUZ (Frontend hallediyor)
-  // Eğer frontend resimUrl göndermediyse varsayılan bir resim koy.
-  const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
-
-  const { error } = await supabase.from('urunler').insert([{ 
-      baslik, fiyat, kategori, sehir, ilce, durum, 
-      resim_url: resimUrl, // <-- BURASI DEĞİŞTİ
-      iletisim: '0555-XXX-XX-XX',
-      user_id: user.id
-  }]);
-
-  if (error) return false;
-  revalidatePath('/takas');
-  return true;
-}
-
-// --- CLOUDINARY İMZA (Market ve Medya için Ortak) ---
-export async function getCloudinarySignature() {
-  const supabase = await getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Giriş yapmalısın");
-
-  const timestamp = Math.round(new Date().getTime() / 1000);
-  const signature = cloudinary.utils.api_sign_request(
-    {
-      timestamp: timestamp,
-      folder: 'bebek-pwa-urunler', // Market için klasör (Medya da burayı kullanabilir veya parametre alabilir)
-    },
-    process.env.CLOUDINARY_API_SECRET!
-  );
-
-  return { timestamp, signature };
-}
-
-// --- MEDYA KAYIT ---
+// --- MEDYA ---
 export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string, tip: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
-  const { error } = await supabase.from('medya_kutusu').insert([{
-    user_id: user.id,
-    baslik,
-    dosya_url: dosyaUrl,
-    tip, 
-    süre: sure
-  }]);
-
+  const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
   if (error) { console.error("DB Kayıt hatası:", error); return false; }
   revalidatePath('/medya');
   return true;
@@ -334,7 +331,6 @@ export async function medyaSil(id: number) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
   await supabase.from('medya_kutusu').delete().match({ id, user_id: user.id });
   revalidatePath('/medya');
   return true;
