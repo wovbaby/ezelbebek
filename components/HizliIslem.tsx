@@ -1,82 +1,173 @@
-"use client";
+'use client'
 
-import { Utensils, Moon, Wind, X, Check } from 'lucide-react';
-import { aktiviteEkle } from '@/app/actions';
 import { useState } from 'react';
-
-// ... (SECENEKLER listesi aynı kalsın) ...
-const SECENEKLER: Record<string, string[]> = {
-  mama: ['Anne Sütü', 'Formül Mama', 'Ek Gıda', 'Su', 'Meyve'],
-  bez: ['Sadece Çiş', 'Sadece Kaka', 'Çiş & Kaka', 'İshal', 'Koyu Renk Kaka', 'Bez Sızdırmış'],
-  uyku: ['Gece Uykusu', 'Şekerleme', 'Emerek Uyuma', 'Sallayarak Uyuma']
-};
+import { Utensils, Moon, Wind, Check, X, Droplets, Clock } from 'lucide-react';
+import { aktiviteEkle } from '@/app/actions';
 
 export default function HizliIslem() {
-  const [yukleniyor, setYukleniyor] = useState(false);
-  const [secilenTip, setSecilenTip] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [acikIslem, setAcikIslem] = useState<string | null>(null); // 'mama', 'uyku', 'bez'
+  const [detay, setDetay] = useState('');
 
-  const butonTikla = (tip: string) => { setSecilenTip(tip); };
-
-  const detaySecVeKaydet = async (detay: string) => {
-    if (!secilenTip) return;
-    setYukleniyor(true);
-    await aktiviteEkle(secilenTip, detay);
-    setYukleniyor(false);
-    setSecilenTip(null);
+  // Form Gönderme
+  const kaydet = async () => {
+    if (!acikIslem) return;
+    setLoading(true);
+    
+    // Detay metnini oluştur (Örn: "120cc Mama" veya "Çişli Bez")
+    const islemDetay = detay || (acikIslem === 'mama' ? '120cc' : acikIslem === 'bez' ? 'Çişli' : '1 saat');
+    
+    await aktiviteEkle(acikIslem, islemDetay);
+    
+    setLoading(false);
+    setAcikIslem(null); // Formu kapat
+    setDetay('');
   };
 
   return (
     <>
-      {/* --- ANA BUTONLAR (KÜÇÜLTÜLDÜ) --- */}
-      <div className="bg-white rounded-2xl shadow-sm p-3 mb-4 border border-gray-100">
-        <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-3 ml-1">
-            {yukleniyor ? 'Kaydediliyor...' : 'Hızlı Ekle'}
-        </h3>
-        
-        <div className="grid grid-cols-3 gap-3">
-            <ButtonAna icon={Utensils} label="Mama" color="orange" onClick={() => butonTikla('mama')} />
-            <ButtonAna icon={Wind} label="Bez" color="blue" onClick={() => butonTikla('bez')} />
-            <ButtonAna icon={Moon} label="Uyku" color="indigo" onClick={() => butonTikla('uyku')} />
-        </div>
+      {/* --- 1. SABİT BUTONLAR (STICKY BAR) --- */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* MAMA BUTONU */}
+        <button 
+          onClick={() => setAcikIslem('mama')}
+          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all active:scale-95 shadow-sm border ${acikIslem === 'mama' ? 'bg-orange-500 text-white border-orange-600 ring-2 ring-orange-200' : 'bg-white text-gray-600 border-gray-100'}`}
+        >
+          <Utensils className="w-6 h-6" />
+          <span className="text-xs font-bold">Mama</span>
+        </button>
+
+        {/* BEZ BUTONU */}
+        <button 
+          onClick={() => setAcikIslem('bez')}
+          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all active:scale-95 shadow-sm border ${acikIslem === 'bez' ? 'bg-blue-500 text-white border-blue-600 ring-2 ring-blue-200' : 'bg-white text-gray-600 border-gray-100'}`}
+        >
+          <Wind className="w-6 h-6" />
+          <span className="text-xs font-bold">Bez</span>
+        </button>
+
+        {/* UYKU BUTONU */}
+        <button 
+          onClick={() => setAcikIslem('uyku')}
+          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all active:scale-95 shadow-sm border ${acikIslem === 'uyku' ? 'bg-indigo-500 text-white border-indigo-600 ring-2 ring-indigo-200' : 'bg-white text-gray-600 border-gray-100'}`}
+        >
+          <Moon className="w-6 h-6" />
+          <span className="text-xs font-bold">Uyku</span>
+        </button>
       </div>
 
-      {/* ... Popup kısmı aynı kalsın ... */}
-      {secilenTip && (
-        <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-10">
+      {/* --- 2. AÇILAN POP-UP FORM (MODAL) --- */}
+      {/* Bu kısım artık her şeyin üzerinde (z-[100]) açılacak */}
+      {acikIslem && (
+        <>
+          {/* Arka Plan Karartma (Backdrop) */}
+          <div 
+            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[90] animate-in fade-in duration-200"
+            onClick={() => setAcikIslem(null)}
+          />
+
+          {/* Form Kartı (Ekranın Ortasında) */}
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white p-5 rounded-3xl shadow-2xl z-[100] animate-in zoom-in-95 duration-200 border border-gray-100">
+            
+            {/* Başlık ve Kapat Butonu */}
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold capitalize text-gray-800">{secilenTip} Detayı</h3>
-              <button onClick={() => setSecilenTip(null)} className="p-1.5 bg-gray-100 rounded-full"><X className="w-4 h-4 text-gray-500" /></button>
+               <h3 className="text-lg font-bold flex items-center gap-2 capitalize">
+                  {acikIslem === 'mama' && <Utensils className="w-5 h-5 text-orange-500" />}
+                  {acikIslem === 'bez' && <Wind className="w-5 h-5 text-blue-500" />}
+                  {acikIslem === 'uyku' && <Moon className="w-5 h-5 text-indigo-500" />}
+                  {acikIslem} Ekle
+               </h3>
+               <button 
+                 onClick={() => setAcikIslem(null)}
+                 className="p-1 bg-gray-100 rounded-full hover:bg-gray-200"
+               >
+                 <X className="w-5 h-5 text-gray-500" />
+               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {SECENEKLER[secilenTip].map((detay) => (
-                <button key={detay} onClick={() => detaySecVeKaydet(detay)} disabled={yukleniyor} className="p-3 rounded-xl bg-gray-50 hover:bg-blue-50 border border-gray-200 text-left text-xs font-bold text-gray-700 active:scale-95 transition-all">
-                  {detay}
-                </button>
-              ))}
+
+            {/* İçerik Seçenekleri */}
+            <div className="space-y-4">
+              
+              {/* MAMA SEÇENEKLERİ */}
+              {acikIslem === 'mama' && (
+                <div className="grid grid-cols-3 gap-2">
+                  {['90cc', '120cc', '150cc', '180cc', 'Emzirme', 'Ek Gıda'].map((opt) => (
+                    <button 
+                      key={opt}
+                      onClick={() => setDetay(opt)}
+                      className={`py-2 px-1 text-xs font-bold rounded-xl border ${detay === opt ? 'bg-orange-500 text-white border-orange-600' : 'bg-orange-50 text-orange-700 border-orange-100'}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* BEZ SEÇENEKLERİ */}
+              {acikIslem === 'bez' && (
+                <div className="flex gap-2">
+                  {['Çişli', 'Kakalı', 'Dolu'].map((opt) => (
+                    <button 
+                      key={opt}
+                      onClick={() => setDetay(opt)}
+                      className={`flex-1 py-3 text-sm font-bold rounded-xl border ${detay === opt ? 'bg-blue-500 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-100'}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* UYKU SEÇENEKLERİ */}
+              {acikIslem === 'uyku' && (
+                <div className="grid grid-cols-2 gap-2">
+                   {['30 dk', '1 saat', '2 saat', 'Gece Uykusu'].map((opt) => (
+                    <button 
+                      key={opt}
+                      onClick={() => setDetay(opt)}
+                      className={`py-3 text-xs font-bold rounded-xl border ${detay === opt ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Manuel Giriş */}
+              <div>
+                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-1 block">Veya Not Yaz</label>
+                 <input 
+                   type="text" 
+                   value={detay}
+                   onChange={(e) => setDetay(e.target.value)}
+                   placeholder={acikIslem === 'mama' ? 'Örn: Çorba yedi...' : 'Not ekle...'}
+                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                 />
+              </div>
+
+              {/* Kaydet Butonu */}
+              <button 
+                onClick={kaydet}
+                disabled={loading}
+                className={`w-full py-3.5 rounded-xl text-white font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2
+                  ${acikIslem === 'mama' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' : 
+                    acikIslem === 'bez' ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-200' : 
+                    'bg-indigo-500 hover:bg-indigo-600 shadow-indigo-200'
+                  }`}
+              >
+                {loading ? (
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                    <>
+                       <Check className="w-5 h-5" /> Kaydet
+                    </>
+                )}
+              </button>
             </div>
+
           </div>
-        </div>
+        </>
       )}
     </>
   );
 }
-
-function ButtonAna({ icon: Icon, label, color, onClick }: any) {
-  const colorClasses: any = {
-    orange: 'bg-orange-50 text-orange-600',
-    blue: 'bg-blue-50 text-blue-600',
-    indigo: 'bg-indigo-50 text-indigo-600'
-  };
-
-  return (
-    <button onClick={onClick} className="flex flex-col items-center gap-1.5 group active:scale-90 transition-transform">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border border-gray-100 ${colorClasses[color]}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <span className="text-[10px] font-bold text-gray-500">{label}</span>
-    </button>
-  );
-}
-
-//

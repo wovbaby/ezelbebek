@@ -308,3 +308,65 @@ export async function kaloriEkle(miktar: number) {
   revalidatePath('/anne'); revalidatePath('/profil');
   return true;
 }
+// --- app/actions.ts DOSYASININ EN ALTINA EKLE ---
+
+// 13. MEDYA YÜKLEME (Ses Dosyası veya Kayıt)
+export async function medyaYukle(formData: FormData) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const baslik = formData.get('baslik') as string;
+  const tip = formData.get('tip') as string; // 'ninni' veya 'kayit'
+  const dosya = formData.get('dosya') as File;
+
+  let dosyaUrl = null;
+  let sure = "00:00"; // Süre hesaplama frontend'de yapılabilir veya varsayılan kalır
+
+  if (dosya && dosya.size > 0) {
+    try {
+      const arrayBuffer = await dosya.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const uploadResult: any = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          { 
+            folder: 'bebek-medya', 
+            resource_type: "video", // Ses dosyaları için 'video' veya 'auto' kullanılır
+            format: 'mp3' // Formatı zorlayalım
+          },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        ).end(buffer);
+      });
+      dosyaUrl = uploadResult.secure_url;
+      // Cloudinary süreyi saniye olarak verir, dakikaya çevirebiliriz (uploadResult.duration)
+      if (uploadResult.duration) {
+         const dk = Math.floor(uploadResult.duration / 60);
+         const sn = Math.floor(uploadResult.duration % 60);
+         sure = `${dk}:${sn < 10 ? '0'+sn : sn}`;
+      }
+    } catch (error) { console.error("Medya yükleme hatası:", error); return false; }
+  }
+
+  const { error } = await supabase.from('medya_kutusu').insert([{
+    user_id: user.id,
+    baslik,
+    dosya_url: dosyaUrl,
+    tip,
+    süre: sure
+  }]);
+
+  if (error) return false;
+  revalidatePath('/medya');
+  return true;
+}
+
+// 14. MEDYA SİLME
+export async function medyaSil(id: number) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  await supabase.from('medya_kutusu').delete().match({ id, user_id: user.id });
+  revalidatePath('/medya');
+  return true;
+}

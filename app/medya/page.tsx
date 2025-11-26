@@ -1,20 +1,50 @@
-import { supabase } from '@/lib/supabaseClient';
-import { PlayCircle, Music, BookOpen, Zap, PauseCircle } from 'lucide-react';
-import SesOynatici from '@/components/SesOynatici'; // Birazdan yapacağız
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { PlayCircle, Music, BookOpen, Zap, Mic } from 'lucide-react';
+import SesOynatici from '@/components/SesOynatici'; // Genel sesler için
+import KullaniciMedyasi from '@/components/KullaniciMedyasi'; // YENİ: Kayıt ve Yükleme için
 
 export const revalidate = 0;
 
 export default async function MedyaPage() {
-  // Tüm medyaları çek
-  const { data: medyalar } = await supabase
+  const cookieStore = await cookies();
+
+  // 1. Güvenli Supabase Client
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+           try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
+        },
+      },
+    }
+  );
+
+  // 2. Kullanıcı Kontrolü
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  // 3. Genel Medyaları Çek (Admin Ekledikleri)
+  const { data: genelMedyalar } = await supabase
     .from('medya')
     .select('*')
     .order('kategori', { ascending: true });
 
+  // 4. Kullanıcının Kendi Medyalarını Çek (Kayıtlar)
+  const { data: kullaniciMedyasi } = await supabase
+    .from('medya_kutusu')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
   // Kategorilere Ayır
-  const kolikSesleri = medyalar?.filter(m => m.kategori === 'Kolik') || [];
-  const ninniler = medyalar?.filter(m => m.kategori === 'Ninni') || [];
-  const masallar = medyalar?.filter(m => m.kategori === 'Masal') || [];
+  const kolikSesleri = genelMedyalar?.filter(m => m.kategori === 'Kolik') || [];
+  const ninniler = genelMedyalar?.filter(m => m.kategori === 'Ninni') || [];
+  const masallar = genelMedyalar?.filter(m => m.kategori === 'Masal') || [];
 
   return (
     <main className="min-h-screen bg-slate-900 text-white pb-32">
@@ -30,19 +60,30 @@ export default async function MedyaPage() {
 
         <div className="p-6 space-y-8">
             
-            {/* 1. KOLİK SESLERİ (Yatay Kaydırma) */}
+            {/* 1. ÖZEL BÖLÜM: BENİM KAYITLARIM (YENİ) */}
+            <section className="bg-slate-800/50 p-4 rounded-2xl border border-white/5">
+                 <h2 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                    <Mic className="w-4 h-4 text-red-400" /> Benim Seslerim
+                 </h2>
+                 {/* Kayıt ve Yükleme Bileşeni */}
+                 <KullaniciMedyasi baslangicListesi={kullaniciMedyasi || []} />
+            </section>
+
+            {/* 2. KOLİK SESLERİ (Yatay Kaydırma) */}
             <section>
                 <h2 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-yellow-400" /> Beyaz Gürültü (Kolik)
                 </h2>
                 <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                     {kolikSesleri.map((ses) => (
-                        <SesOynatici key={ses.id} veri={ses} />
+                        <div key={ses.id} className="shrink-0 w-32">
+                           <SesOynatici veri={ses} />
+                        </div>
                     ))}
                 </div>
             </section>
 
-            {/* 2. NİNNİLER (Liste) */}
+            {/* 3. NİNNİLER (Liste) */}
             <section>
                 <h2 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
                     <Music className="w-4 h-4 text-blue-400" /> Ninniler
@@ -54,7 +95,7 @@ export default async function MedyaPage() {
                 </div>
             </section>
 
-            {/* 3. MASALLAR (Kartlar) */}
+            {/* 4. MASALLAR (Kartlar) */}
             <section>
                 <h2 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-green-400" /> Masallar
