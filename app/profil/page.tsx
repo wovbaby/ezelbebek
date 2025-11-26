@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import ProfilForm from '@/components/ProfilForm';
-import { Trophy, Star, Settings, LogOut, Plus } from 'lucide-react';
+import { Trophy, Star, Settings, LogOut, Plus, Baby } from 'lucide-react'; // Baby ikonunu ekledim
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -12,7 +12,6 @@ async function cikisYap() {
   'use server'
   const cookieStore = await cookies();
   
-  // Çıkış işlemi için de güvenli client oluşturuyoruz
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -33,10 +32,10 @@ async function cikisYap() {
 }
 
 export default async function ProfilPage() {
-  // 1. Çerezleri Al (Next.js 15 uyumlu await ile)
+  // 1. Çerezleri Al
   const cookieStore = await cookies();
 
-  // 2. Güvenli Supabase İstemcisi Oluştur
+  // 2. Güvenli Supabase İstemcisi
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -52,29 +51,37 @@ export default async function ProfilPage() {
     }
   );
 
-  // 3. Kullanıcıyı Kontrol Et (Giriş yapmamışsa at)
+  // 3. Kullanıcı Kontrolü
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     redirect('/login');
   }
 
   // 4. Sadece Bu Kullanıcıya Ait Bebekleri Getir
-  // (.eq('user_id', user.id) EKLENDİ)
   const { data: bebekler } = await supabase
     .from('bebekler')
     .select('*')
-    .eq('user_id', user.id) // <-- KRİTİK FİLTRE BURASI
+    .eq('user_id', user.id)
     .order('id');
+
+  // --- YENİ EKLENDİ: Sadece Bu Kullanıcıya Ait Anneyi Getir ---
+  let { data: anne } = await supabase
+    .from('anne_profili')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  // Eğer anne profili henüz yoksa varsayılan boş obje oluştur (Hata vermesin diye)
+  if (!anne) {
+      anne = { ad: 'Anne', su_hedefi: 2000, resim_url: null };
+  }
   
   // 5. Seçili ve Aktif Bebeği Belirle
   const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
-  
-  // Eğer seçili ID kullanıcının bebekleri arasındaysa onu al, yoksa ilkini al
   const aktifId = (seciliId && bebekler?.find(b => b.id === seciliId)) ? seciliId : bebekler?.[0]?.id;
   const seciliBebek = bebekler?.find(b => b.id === aktifId) || bebekler?.[0];
 
-  // 6. İstatistikler (Sadece Aktif Bebek İçin)
-  // İstatistikleri çekmek için aktifId'nin dolu olduğundan emin olalım
+  // 6. İstatistikler
   let mamaSayisi = 0, bezSayisi = 0, uykuSayisi = 0, ilanSayisi = 0;
 
   if (aktifId) {
@@ -87,7 +94,6 @@ export default async function ProfilPage() {
       uykuSayisi = uykuRes.count || 0;
   }
   
-  // İlan sayısı genel olabilir veya kullanıcıya özel olabilir (şimdilik genel bıraktım)
   const ilanRes = await supabase.from('urunler').select('*', { count: 'exact', head: true });
   ilanSayisi = ilanRes.count || 0;
 
@@ -99,7 +105,7 @@ export default async function ProfilPage() {
 
         <div className="px-6 -mt-36 relative z-10">
             
-            {/* Bebek Listesi Başlığı ve Ekle Butonu */}
+            {/* Bebek Listesi Başlığı */}
             <div className="flex items-center justify-between mb-3 text-white/90 px-1">
                 <h3 className="font-bold text-sm">Bebeklerim</h3>
                 <Link href="/profil/ekle" className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full font-bold flex items-center gap-1 transition-colors backdrop-blur-sm border border-white/10">
@@ -127,8 +133,29 @@ export default async function ProfilPage() {
                     </div>
                 )}
             </div>
+
+            {/* --- YENİ: ANNE PROFİL KARTI --- */}
+            {/* Anne Profilini buraya ekliyoruz ki kullanıcı kendi resmini görsün */}
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    {anne?.resim_url ? (
+                        <img src={anne.resim_url} className="w-12 h-12 rounded-full object-cover border border-gray-200" alt="Anne" />
+                    ) : (
+                        <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-400">
+                            <Baby className="w-6 h-6" />
+                        </div>
+                    )}
+                    <div>
+                        <h4 className="font-bold text-gray-800 text-sm">{anne?.ad || 'Anne Profili'}</h4>
+                        <p className="text-xs text-gray-500">Hedef: {anne?.su_hedefi}ml Su</p>
+                    </div>
+                </div>
+                <Link href="/anne" className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-bold">
+                    Düzenle
+                </Link>
+            </div>
             
-            {/* KART 1: Bebek Künyesi (Düzenlenebilir Form) */}
+            {/* KART 1: Bebek Künyesi */}
             {seciliBebek ? (
                 <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 border border-gray-100">
                     <ProfilForm bebek={seciliBebek} />
@@ -173,7 +200,7 @@ export default async function ProfilPage() {
   );
 }
 
-// Küçük yardımcı bileşenler
+// Helper bileşenler aynı
 function StatCard({ label, value, color }: any) {
     return (
         <div className={`p-4 rounded-2xl ${color} flex flex-col items-center justify-center`}>
