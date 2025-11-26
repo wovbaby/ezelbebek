@@ -1,4 +1,6 @@
-import { supabase } from '@/lib/supabaseClient';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Camera, Dumbbell, Flame } from 'lucide-react';
 import { suIc, suSifirla, anneGuncelle } from '@/app/actions';
 import Link from 'next/link';
@@ -57,9 +59,39 @@ function motivasyonUret(anneAdi: string) {
 }
 
 export default async function AnnePage() {
-  const { data: anne } = await supabase.from('anne_profili').select('*').single();
+  // 1. Çerezleri ve Supabase Client'ı oluştur
+  const cookieStore = await cookies();
   
-  // Dinamik Mesajı Oluştur
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+           try {
+             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+           } catch {}
+        },
+      },
+    }
+  );
+
+  // 2. Kullanıcıyı Kontrol Et
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    redirect('/login');
+  }
+
+  // 3. SADECE Bu Kullanıcının Anne Profilini Getir
+  let { data: anne } = await supabase
+    .from('anne_profili')
+    .select('*')
+    .eq('user_id', user.id) // <-- KRİTİK DEĞİŞİKLİK
+    .single();
+
+  // 4. Dinamik Mesajı Oluştur
   const gununSozu = motivasyonUret(anne?.ad || "Anne");
 
   // --- DÖNGÜ HESAPLAMA ---
@@ -197,7 +229,7 @@ export default async function AnnePage() {
                 </div>
             </div>
 
-            {/* 4. SPOR VE EGZERSİZ (YENİ) */}
+            {/* 4. SPOR VE EGZERSİZ */}
             <Link href="/anne/spor">
                 <div className="bg-orange-500 text-white p-5 rounded-2xl shadow-lg shadow-orange-200 mt-6 flex items-center justify-between cursor-pointer active:scale-95 transition-transform">
                     <div>
@@ -210,7 +242,7 @@ export default async function AnnePage() {
                         <p className="text-2xl font-bold flex items-center gap-1 justify-end">
                             {anne?.yakilan_kalori || 0} <Flame className="w-4 h-4 fill-white" />
                         </p>
-                        <p className="text-[10px] uppercase font-bold opacity-80">Yakılan Kalori</p>
+                        <p className="text-left text-[10px] uppercase font-bold opacity-80">Yakılan Kalori</p>
                     </div>
                 </div>
             </Link>
