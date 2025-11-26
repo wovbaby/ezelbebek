@@ -15,7 +15,6 @@ export default function HizliIslem() {
     setLoading(true);
     
     // Detay metnini oluştur (Örn: "120cc Mama" veya "Çişli Bez")
-    // Eğer kullanıcı detay girmediyse varsayılan bir değer ata
     const islemDetay = detay || (acikIslem === 'mama' ? '120cc' : acikIslem === 'bez' ? 'Çişli' : '1 saat');
     
     await aktiviteEkle(acikIslem, islemDetay);
@@ -57,47 +56,50 @@ export default function HizliIslem() {
         </button>
       </div>
 
-      {/* --- 2. AÇILAN POP-UP FORM (MODAL) --- */}
-      {/* DÜZELTME: z-index değerleri 9999'a çekildi. Artık Header'ın üzerinde duracak. */}
-      
+      {/* --- 2. AÇILAN POP-UP FORM (BOTTOM SHEET) --- */}
       {acikIslem && (
         <>
           {/* Arka Plan Karartma (Backdrop) */}
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] animate-in fade-in duration-200"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] animate-in fade-in duration-300"
             onClick={() => setAcikIslem(null)}
           />
 
-          {/* Form Kartı (Ekranın Ortasında) */}
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white p-5 rounded-3xl shadow-2xl z-[9999] animate-in zoom-in-95 duration-200 border border-gray-100">
+          {/* Form Kartı (Ekranın Altından Kayarak Gelir) */}
+          <div className="fixed bottom-0 left-0 w-full bg-white p-6 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] z-[9999] animate-in slide-in-from-bottom duration-300 border-t border-gray-100 pb-12">
             
+            {/* Tutamaç (Handle) - Mobil hissi için */}
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+
             {/* Başlık ve Kapat Butonu */}
-            <div className="flex justify-between items-center mb-4">
-               <h3 className="text-lg font-bold flex items-center gap-2 capitalize text-gray-800">
-                  {acikIslem === 'mama' && <Utensils className="w-5 h-5 text-orange-500" />}
-                  {acikIslem === 'bez' && <Wind className="w-5 h-5 text-blue-500" />}
-                  {acikIslem === 'uyku' && <Moon className="w-5 h-5 text-indigo-500" />}
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="text-xl font-bold flex items-center gap-3 capitalize text-gray-800">
+                  <span className={`p-2 rounded-xl ${acikIslem === 'mama' ? 'bg-orange-100 text-orange-600' : acikIslem === 'bez' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                    {acikIslem === 'mama' && <Utensils className="w-6 h-6" />}
+                    {acikIslem === 'bez' && <Wind className="w-6 h-6" />}
+                    {acikIslem === 'uyku' && <Moon className="w-6 h-6" />}
+                  </span>
                   {acikIslem} Ekle
                </h3>
                <button 
                  onClick={() => setAcikIslem(null)}
-                 className="p-1 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-500 transition-colors"
+                 className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                >
-                 <X className="w-5 h-5" />
+                 <X className="w-6 h-6" />
                </button>
             </div>
 
             {/* İçerik Seçenekleri */}
-            <div className="space-y-4">
+            <div className="space-y-5">
               
               {/* MAMA SEÇENEKLERİ */}
               {acikIslem === 'mama' && (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-3">
                   {['90cc', '120cc', '150cc', '180cc', 'Emzirme', 'Ek Gıda'].map((opt) => (
                     <button 
                       key={opt}
                       onClick={() => setDetay(opt)}
-                      className={`py-2 px-1 text-xs font-bold rounded-xl border transition-colors ${detay === opt ? 'bg-orange-500 text-white border-orange-600' : 'bg-orange-50 text-orange-700 border-orange-100 hover:bg-orange-100'}`}
+                      className={`py-3 px-2 text-sm font-bold rounded-2xl border transition-all active:scale-95 ${detay === opt ? 'bg-orange-500 text-white border-orange-600 shadow-lg shadow-orange-200' : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50'}`}
                     >
                       {opt}
                     </button>
@@ -107,12 +109,12 @@ export default function HizliIslem() {
 
               {/* BEZ SEÇENEKLERİ */}
               {acikIslem === 'bez' && (
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   {['Çişli', 'Kakalı', 'Dolu'].map((opt) => (
                     <button 
                       key={opt}
                       onClick={() => setDetay(opt)}
-                      className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-colors ${detay === opt ? 'bg-blue-500 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100'}`}
+                      className={`flex-1 py-4 text-base font-bold rounded-2xl border transition-all active:scale-95 ${detay === opt ? 'bg-blue-500 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'}`}
                     >
                       {opt}
                     </button>
@@ -122,12 +124,12 @@ export default function HizliIslem() {
 
               {/* UYKU SEÇENEKLERİ */}
               {acikIslem === 'uyku' && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                    {['30 dk', '1 saat', '2 saat', 'Gece Uykusu'].map((opt) => (
                     <button 
                       key={opt}
                       onClick={() => setDetay(opt)}
-                      className={`py-3 text-xs font-bold rounded-xl border transition-colors ${detay === opt ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'}`}
+                      className={`py-4 text-sm font-bold rounded-2xl border transition-all active:scale-95 ${detay === opt ? 'bg-indigo-500 text-white border-indigo-600 shadow-lg shadow-indigo-200' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'}`}
                     >
                       {opt}
                     </button>
@@ -137,13 +139,13 @@ export default function HizliIslem() {
 
               {/* Manuel Giriş */}
               <div>
-                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-1 block">Veya Not Yaz</label>
+                 <label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-2 block">Veya Not Yaz</label>
                  <input 
                    type="text" 
                    value={detay}
                    onChange={(e) => setDetay(e.target.value)}
                    placeholder={acikIslem === 'mama' ? 'Örn: Çorba yedi...' : 'Not ekle...'}
-                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-800 placeholder:text-gray-400"
+                   className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-base outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white text-gray-800 placeholder:text-gray-400 transition-all"
                  />
               </div>
 
@@ -151,17 +153,17 @@ export default function HizliIslem() {
               <button 
                 onClick={kaydet}
                 disabled={loading}
-                className={`w-full py-3.5 rounded-xl text-white font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2
+                className={`w-full py-4 rounded-2xl text-white font-bold text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 mt-2
                   ${acikIslem === 'mama' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' : 
                     acikIslem === 'bez' ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-200' : 
                     'bg-indigo-500 hover:bg-indigo-600 shadow-indigo-200'
                   }`}
               >
                 {loading ? (
-                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                     <>
-                       <Check className="w-5 h-5" /> Kaydet
+                       <Check className="w-6 h-6" /> Kaydet
                     </>
                 )}
               </button>
