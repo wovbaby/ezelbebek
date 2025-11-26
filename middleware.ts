@@ -9,7 +9,12 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  // 2. Supabase Client'ı oluştur (Cookie yönetimi ile)
+  // 2. API route'larını middleware'den hariç tut
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    return response
+  }
+
+  // 3. Supabase Client'ı oluştur (Cookie yönetimi ile)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,7 +36,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 3. Kullanıcıyı kontrol et
+  // 4. Kullanıcıyı kontrol et
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -60,7 +65,8 @@ export const config = {
      * - favicon.ico
      * - .png, .jpg, .svg, .json (PWA dosyaları, resimler)
      * - OneSignal scriptleri
+     * - API route'ları (yeni eklenen)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|manifest.json|OneSignal).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|manifest.json|OneSignal|api/).*)',
   ],
 }
