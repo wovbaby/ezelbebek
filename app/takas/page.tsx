@@ -8,7 +8,7 @@ import KonumFiltre from '@/components/KonumFiltre'; // Şehir Filtresi
 
 export const revalidate = 0;
 
-// Next.js 15 için Props Tipi
+// Next.js 15 için Props Tipi (searchParams artık Promise)
 type Props = {
   searchParams: Promise<{ sehir?: string; ekle?: string }>
 }
@@ -142,7 +142,7 @@ export default async function TakasPage(props: Props) {
                     {/* Kapat Butonu: URL'den ?ekle=true parametresini kaldırır */}
                     <Link 
                         href={`/takas${sehir ? `?sehir=${sehir}` : ''}`} 
-                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full"
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full z-10"
                     >
                         <Plus className="w-5 h-5 rotate-45" />
                     </Link>
