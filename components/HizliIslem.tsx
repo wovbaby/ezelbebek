@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react';
-import { Utensils, Moon, Wind, Check, X, Droplets, Clock } from 'lucide-react';
+import { Utensils, Moon, Wind, Check, X } from 'lucide-react';
 import { aktiviteEkle } from '@/app/actions';
 
 export default function HizliIslem() {
@@ -15,6 +15,7 @@ export default function HizliIslem() {
     setLoading(true);
     
     // Detay metnini oluştur (Örn: "120cc Mama" veya "Çişli Bez")
+    // Eğer kullanıcı detay girmediyse varsayılan bir değer ata
     const islemDetay = detay || (acikIslem === 'mama' ? '120cc' : acikIslem === 'bez' ? 'Çişli' : '1 saat');
     
     await aktiviteEkle(acikIslem, islemDetay);
@@ -57,21 +58,22 @@ export default function HizliIslem() {
       </div>
 
       {/* --- 2. AÇILAN POP-UP FORM (MODAL) --- */}
-      {/* Bu kısım artık her şeyin üzerinde (z-[100]) açılacak */}
+      {/* DÜZELTME: z-index değerleri 9999'a çekildi. Artık Header'ın üzerinde duracak. */}
+      
       {acikIslem && (
         <>
           {/* Arka Plan Karartma (Backdrop) */}
           <div 
-            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[90] animate-in fade-in duration-200"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] animate-in fade-in duration-200"
             onClick={() => setAcikIslem(null)}
           />
 
           {/* Form Kartı (Ekranın Ortasında) */}
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white p-5 rounded-3xl shadow-2xl z-[100] animate-in zoom-in-95 duration-200 border border-gray-100">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white p-5 rounded-3xl shadow-2xl z-[9999] animate-in zoom-in-95 duration-200 border border-gray-100">
             
             {/* Başlık ve Kapat Butonu */}
             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-lg font-bold flex items-center gap-2 capitalize">
+               <h3 className="text-lg font-bold flex items-center gap-2 capitalize text-gray-800">
                   {acikIslem === 'mama' && <Utensils className="w-5 h-5 text-orange-500" />}
                   {acikIslem === 'bez' && <Wind className="w-5 h-5 text-blue-500" />}
                   {acikIslem === 'uyku' && <Moon className="w-5 h-5 text-indigo-500" />}
@@ -79,9 +81,9 @@ export default function HizliIslem() {
                </h3>
                <button 
                  onClick={() => setAcikIslem(null)}
-                 className="p-1 bg-gray-100 rounded-full hover:bg-gray-200"
+                 className="p-1 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-500 transition-colors"
                >
-                 <X className="w-5 h-5 text-gray-500" />
+                 <X className="w-5 h-5" />
                </button>
             </div>
 
@@ -95,7 +97,7 @@ export default function HizliIslem() {
                     <button 
                       key={opt}
                       onClick={() => setDetay(opt)}
-                      className={`py-2 px-1 text-xs font-bold rounded-xl border ${detay === opt ? 'bg-orange-500 text-white border-orange-600' : 'bg-orange-50 text-orange-700 border-orange-100'}`}
+                      className={`py-2 px-1 text-xs font-bold rounded-xl border transition-colors ${detay === opt ? 'bg-orange-500 text-white border-orange-600' : 'bg-orange-50 text-orange-700 border-orange-100 hover:bg-orange-100'}`}
                     >
                       {opt}
                     </button>
@@ -110,7 +112,7 @@ export default function HizliIslem() {
                     <button 
                       key={opt}
                       onClick={() => setDetay(opt)}
-                      className={`flex-1 py-3 text-sm font-bold rounded-xl border ${detay === opt ? 'bg-blue-500 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-100'}`}
+                      className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-colors ${detay === opt ? 'bg-blue-500 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100'}`}
                     >
                       {opt}
                     </button>
@@ -125,7 +127,7 @@ export default function HizliIslem() {
                     <button 
                       key={opt}
                       onClick={() => setDetay(opt)}
-                      className={`py-3 text-xs font-bold rounded-xl border ${detay === opt ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}
+                      className={`py-3 text-xs font-bold rounded-xl border transition-colors ${detay === opt ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'}`}
                     >
                       {opt}
                     </button>
@@ -141,7 +143,7 @@ export default function HizliIslem() {
                    value={detay}
                    onChange={(e) => setDetay(e.target.value)}
                    placeholder={acikIslem === 'mama' ? 'Örn: Çorba yedi...' : 'Not ekle...'}
-                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-800 placeholder:text-gray-400"
                  />
               </div>
 
