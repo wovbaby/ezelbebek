@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { ShoppingBag, MapPin, Plus } from 'lucide-react';
 import Link from 'next/link';
 import IlanEkleFormu from '@/components/IlanEkleFormu'; // Direct Upload Formu
-import KonumFiltre from '@/components/KonumFiltre'; // Senin Şehir Filtren
+import KonumFiltre from '@/components/KonumFiltre'; // Şehir Filtresi
 
 export const revalidate = 0;
 
@@ -45,9 +45,9 @@ export default async function TakasPage(props: Props) {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Eğer şehir seçiliyse filtrele
+  // Eğer şehir seçiliyse filtrele (Büyük/Küçük harf duyarsız arama)
   if (sehir) {
-    query = query.ilike('sehir', `%${sehir}%`); // Esnek arama (Büyük/Küçük harf)
+    query = query.ilike('sehir', `%${sehir}%`);
   }
 
   const { data: urunler } = await query;
@@ -68,7 +68,7 @@ export default async function TakasPage(props: Props) {
             </div>
             
             {/* Ekle Butonu (Modal açar) */}
-            {/* Mevcut filtreleri koruyarak ?ekle=true ekler */}
+            {/* Mevcut filtreleri koruyarak ?ekle=true parametresi ekler */}
             <Link 
                 href={`/takas?${new URLSearchParams({ ...(sehir ? { sehir } : {}), ekle: 'true' }).toString()}`}
                 className="bg-purple-600 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg active:scale-95 transition-transform"
@@ -114,6 +114,7 @@ export default async function TakasPage(props: Props) {
                                 <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md inline-block capitalize">
                                     {urun.kategori}
                                 </span>
+                                {/* Detay butonu eklenebilir */}
                             </div>
                         </div>
                     </div>
@@ -125,15 +126,20 @@ export default async function TakasPage(props: Props) {
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                     <ShoppingBag className="w-12 h-12 text-gray-200 mb-3" />
                     <p className="text-gray-500 font-medium text-sm">Bu kriterlerde hiç ürün yok.</p>
-                    {sehir && <Link href="/takas" className="text-xs text-purple-600 mt-2 underline">Filtreyi Temizle</Link>}
+                    {sehir && (
+                        <Link href="/takas" className="text-xs text-purple-600 mt-2 underline">
+                            Filtreyi Temizle
+                        </Link>
+                    )}
                 </div>
             )}
         </div>
 
-        {/* --- İLAN EKLEME MODALI (Direct Upload Formu İçerir) --- */}
+        {/* --- İLAN EKLEME MODALI --- */}
         {modalAcik && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-md rounded-3xl p-6 relative animate-in slide-in-from-bottom-10 duration-300 shadow-2xl">
+                <div className="bg-white w-full max-w-md rounded-3xl p-6 relative animate-in slide-in-from-bottom-10 duration-300 shadow-2xl max-h-[90vh] overflow-y-auto">
+                    {/* Kapat Butonu: URL'den ?ekle=true parametresini kaldırır */}
                     <Link 
                         href={`/takas${sehir ? `?sehir=${sehir}` : ''}`} 
                         className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full"
@@ -144,7 +150,7 @@ export default async function TakasPage(props: Props) {
                     <h2 className="text-xl font-bold text-gray-800 mb-1 text-center">Yeni İlan Ekle</h2>
                     <p className="text-xs text-gray-400 text-center mb-6">Fotoğraf yükle ve detayları gir</p>
                     
-                    {/* Direct Upload Form Bileşeni */}
+                    {/* Direct Upload Yapan Form Bileşeni */}
                     <IlanEkleFormu />
                 </div>
             </div>
