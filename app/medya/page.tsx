@@ -2,8 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Music, BookOpen, Zap, Mic } from 'lucide-react';
-import SesOynatici from '@/components/SesOynatici'; // Genel sesler için (Eski bileşen)
-import KullaniciMedyasi from '@/components/KullaniciMedyasi'; // YENİ: Kayıt ve Yükleme için
+import SesOynatici from '@/components/SesOynatici'; 
+import KullaniciMedyasi from '@/components/KullaniciMedyasi'; 
 
 export const revalidate = 0;
 
@@ -29,7 +29,6 @@ export default async function MedyaPage() {
   if (!user) redirect('/login');
 
   // 3. Genel Medyaları Çek (Yönetici tarafından eklenenler)
-  // Not: 'medya' tablosu yoksa hata verebilir, bu tablonun var olduğundan emin ol.
   const { data: medyalar } = await supabase
     .from('medya')
     .select('*')
@@ -61,7 +60,7 @@ export default async function MedyaPage() {
 
         <div className="p-6 space-y-8">
             
-            {/* 1. ÖZEL BÖLÜM: BENİM KAYITLARIM (YENİ) */}
+            {/* 1. ÖZEL BÖLÜM: BENİM KAYITLARIM */}
             <section className="bg-slate-800/50 p-4 rounded-2xl border border-white/5">
                  <h2 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
                     <Mic className="w-4 h-4 text-red-400" /> Benim Seslerim
@@ -79,7 +78,7 @@ export default async function MedyaPage() {
                     <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                         {kolikSesleri.map((ses) => (
                             <div key={ses.id} className="shrink-0 w-32">
-                            <SesOynatici veri={ses} />
+                               <SesOynatici veri={ses} tip="kutu" />
                             </div>
                         ))}
                     </div>

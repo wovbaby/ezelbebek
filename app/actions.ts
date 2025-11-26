@@ -8,7 +8,7 @@ import { cookies } from 'next/headers';
 // --- 1. CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY, // .env.local içindeki server-side key
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
@@ -43,14 +43,12 @@ async function getSeciliBebekId() {
 //              BEBEK İŞLEMLERİ
 // ==========================================
 
-// BEBEK DEĞİŞTİRME
 export async function bebekSec(bebekId: number) {
   const cookieStore = await cookies();
   cookieStore.set('secili_bebek', bebekId.toString());
   revalidatePath('/'); 
 }
 
-// YENİ BEBEK EKLEME
 export async function yeniBebekEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -85,12 +83,11 @@ export async function yeniBebekEkle(formData: FormData) {
       user_id: user.id 
   }]);
 
-  if (error) { console.error("Bebek ekleme hatası:", error); return false; }
+  if (error) return false;
   revalidatePath('/profil'); revalidatePath('/');
   return true;
 }
 
-// BEBEK PROFİL GÜNCELLEME
 export async function profilGuncelle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
@@ -319,7 +316,7 @@ export async function ilanEkle(formData: FormData) {
 //   MEDYA (DIRECT UPLOAD SİSTEMİ - YENİ)
 // ==========================================
 
-// 1. İMZA ALMA (Frontend'den direkt yükleme için - Vercel limitine takılmamak için)
+// 1. İMZA ALMA (Frontend'den direkt yükleme için)
 export async function getCloudinarySignature() {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -327,7 +324,7 @@ export async function getCloudinarySignature() {
 
   const timestamp = Math.round(new Date().getTime() / 1000);
   
-  // İmza oluşturma (Gizli Secret sunucuda kalır)
+  // İmza oluşturma
   const signature = cloudinary.utils.api_sign_request(
     {
       timestamp: timestamp,
@@ -339,7 +336,7 @@ export async function getCloudinarySignature() {
   return { timestamp, signature };
 }
 
-// 2. MEDYA KAYIT (Frontend yüklemeyi bitirince veritabanına yazar)
+// 2. MEDYA KAYIT (Frontend Cloudinary'ye yükledikten sonra bu fonksiyonu çağırır)
 export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string, tip: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
