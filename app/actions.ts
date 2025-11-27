@@ -62,8 +62,6 @@ export async function yeniBebekEkle(formData: FormData) {
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
-  // Profil resimleri genelde küçük olduğu için sunucuda işlenebilir,
-  // ama büyük dosyalar için direct upload önerilir.
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
@@ -265,15 +263,13 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   if(!user) return false;
   
   const yazarAdi = user?.email?.split('@')[0] || 'Anonim Anne';
-  
   const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: yazarAdi, user_id: user.id }]);
   if (error) return false;
   revalidatePath('/forum');
   return true;
 }
 
-// --- İLAN EKLEME (Direct Upload Güncellemesi) ---
-// Artık resim dosyasını sunucuda işlemeye çalışmıyor, URL'i alıyor.
+// --- İLAN EKLE (Direct Upload Uyumlu) ---
 export async function ilanEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -288,7 +284,6 @@ export async function ilanEkle(formData: FormData) {
   const durum = formData.get('durum') as string;
   const iletisim = formData.get('iletisim') as string;
   
-  // Dosya YÜKLEME YOK. Hazır URL'i al.
   const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
 
   if (!baslik || isNaN(fiyat) || !sehir) return { success: false, error: "Zorunlu alanlar eksik." };
@@ -319,7 +314,7 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
   const signature = cloudinary.utils.api_sign_request(
     {
       timestamp: timestamp,
-      folder: folderName, // Dinamik klasör
+      folder: folderName, 
     },
     process.env.CLOUDINARY_API_SECRET!
   );
@@ -327,24 +322,18 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
   return { timestamp, signature };
 }
 
+// 2. MEDYA KAYIT
 export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string, tip: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
-  const { error } = await supabase.from('medya_kutusu').insert([{
-    user_id: user.id,
-    baslik,
-    dosya_url: dosyaUrl,
-    tip, 
-    süre: sure
-  }]);
-
-  if (error) { console.error("DB Kayıt hatası:", error); return false; }
+  const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
+  if (error) return false;
   revalidatePath('/medya');
   return true;
 }
 
+// 3. MEDYA SİLME
 export async function medyaSil(id: number) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -355,22 +344,20 @@ export async function medyaSil(id: number) {
 }
 
 // ==========================================
-//              YORUM İŞLEMLERİ (GÜNCELLENDİ)
+//              YORUM İŞLEMLERİ (DÜZELTİLDİ)
 // ==========================================
 
 export async function yorumEkle(konuId: number, icerik: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   
-  // 1. Giriş Kontrolü
   if (!user) {
-      console.error("Yorum Hatası: Kullanıcı giriş yapmamış.");
-      return { success: false, error: "Lütfen giriş yapın." };
+    console.error("Yorum Hatası: Kullanıcı giriş yapmamış.");
+    return { success: false, error: "Lütfen giriş yapın." };
   }
 
   const yazarAdi = user.email?.split('@')[0] || 'Anonim';
 
-  // 2. Kayıt İşlemi
   const { error } = await supabase.from('forum_yorumlari').insert([{
     konu_id: konuId,
     icerik: icerik,
@@ -378,13 +365,43 @@ export async function yorumEkle(konuId: number, icerik: string) {
     yazar_ad: yazarAdi
   }]);
 
-  // 3. Hata Kontrolü
+  // HATA VARSA GERÇEK SEBEBİ DÖNDÜRÜYORUZ
   if (error) {
     console.error("Supabase Yorum Hatası DETAY:", error.message); 
-    return { success: false, error: error.message }; // Hatayı client'a döndür
+    return { success: false, error: error.message }; 
   }
   
-  // 4. Sayfayı Yenile
   revalidatePath(`/forum/${konuId}`); 
   return { success: true };
+}
+
+// ==========================================
+//             YÖNETİM (ADMİN) İŞLEMLERİ
+// ==========================================
+
+export async function kullaniciOnayla(hedefUserId: string) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return false;
+
+  const { data: yapanKisi } = await supabase
+    .from('profiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single();
+
+  if (yapanKisi?.rol !== 'admin') {
+    return false; 
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ onayli_mi: true })
+    .eq('id', hedefUserId);
+
+  if (error) return false;
+
+  revalidatePath('/yonetim');
+  return true;
 }

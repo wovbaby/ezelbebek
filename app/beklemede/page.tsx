@@ -13,27 +13,9 @@ export default function BeklemedePage() {
             Hesabınız onaylandığında giriş yapabileceksiniz.
         </p>
         
-        <Link href="/api/auth/signout" className="text-orange-600 font-bold text-sm flex items-center gap-2 hover:underline">
-            <LogOut className="w-4 h-4" /> Çıkış Yap
+        <Link href="/login" className="text-orange-600 font-bold text-sm flex items-center gap-2 hover:underline">
+            <LogOut className="w-4 h-4" /> Giriş Ekranına Dön
         </Link>
     </div>
   );
-}
-```
-
-**Kullanıcıyı Oraya Yönlendirme:**
-Bunu `app/page.tsx`'in en başına (user kontrolünden hemen sonra) ekle:
-
-```typescript
-// app/page.tsx içinde...
-
-// ... user kontrolünden hemen sonra ...
-const { data: profil } = await supabase
-  .from('profiles')
-  .select('onayli_mi')
-  .eq('id', user.id)
-  .single();
-
-if (profil && !profil.onayli_mi) {
-    redirect('/beklemede');
 }
