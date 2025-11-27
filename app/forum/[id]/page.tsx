@@ -2,21 +2,14 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, User, MessageCircle, Clock } from 'lucide-react';
-import YorumFormu from '@/components/YorumFormu'; 
+import { MessageCircle, Plus, Search, User } from 'lucide-react';
 
 export const revalidate = 0;
 
-type Props = {
-  params: Promise<{ id: string }>
-}
-
-export default async function ForumDetayPage(props: Props) {
-  // Next.js 15 params
-  const params = await props.params;
-  const konuId = parseInt(params.id);
-
+export default async function ForumPage() {
   const cookieStore = await cookies();
+
+  // 1. Supabase Client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -28,82 +21,88 @@ export default async function ForumDetayPage(props: Props) {
     }
   );
 
-  // 1. Konuyu Getir
-  const { data: konu, error } = await supabase
+  // 2. Kullanıcı Kontrolü
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  // 3. Konuları Çek
+  const { data: konular } = await supabase
     .from('forum_konulari')
     .select('*')
-    .eq('id', konuId)
-    .single();
-
-  if (error || !konu) {
-      return <div className="p-10 text-center">Konu bulunamadı.</div>;
-  }
-
-  // 2. Yorumları Getir
-  const { data: yorumlar } = await supabase
-    .from('forum_yorumlari')
-    .select('*')
-    .eq('konu_id', konuId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <main className="min-h-screen bg-gray-50 pb-24">
         
         {/* Header */}
-        <div className="bg-white p-4 sticky top-0 z-10 border-b border-gray-100 flex items-center gap-3">
-            <Link href="/forum" className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </Link>
-            <h1 className="font-bold text-gray-800 text-lg truncate">Forum Detayı</h1>
+        <div className="bg-white p-4 sticky top-0 z-10 border-b border-gray-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+                <MessageCircle className="w-6 h-6 text-green-500" />
+                <h1 className="text-xl font-bold text-gray-800">Yardımlaşma</h1>
+            </div>
+            
+            {/* Arama Çubuğu (Görsel) */}
+            <div className="relative">
+                <input 
+                    type="text" 
+                    placeholder="Konu ara (örn: kolik, diş...)" 
+                    className="w-full bg-gray-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-200 transition-all"
+                />
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
+            </div>
         </div>
 
         <div className="p-4 space-y-4">
             
-            {/* --- KONU KARTI --- */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-purple-100">
-                <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-1 rounded-md font-bold uppercase mb-2 inline-block">
-                    {konu.kategori}
-                </span>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">{konu.baslik}</h2>
-                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{konu.icerik}</p>
-                
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-50 text-xs text-gray-400">
-                    <User className="w-3 h-3" /> {konu.yazar_ad || 'Anonim'}
-                    <span className="w-1 h-1 bg-gray-300 rounded-full mx-1"></span>
-                    <Clock className="w-3 h-3" /> {new Date(konu.created_at).toLocaleDateString('tr-TR')}
+            {/* Soru Sor Butonu */}
+            <Link href="/forum/sor" className="block">
+                <div className="bg-green-500 text-white p-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 active:scale-95 transition-transform">
+                    <Plus className="w-5 h-5" /> Yeni Soru Sor
                 </div>
-            </div>
+            </Link>
 
-            {/* --- YORUMLAR LİSTESİ --- */}
+            {/* Konu Listesi */}
             <div className="space-y-3">
-                <h3 className="font-bold text-gray-700 text-sm flex items-center gap-2 ml-1">
-                    <MessageCircle className="w-4 h-4" /> Yorumlar ({yorumlar?.length || 0})
-                </h3>
-
-                {yorumlar?.map((yorum) => (
-                    <div key={yorum.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                        <div className="flex justify-between items-start mb-1">
-                            <span className="font-bold text-xs text-purple-600">{yorum.yazar_ad || 'Anonim'}</span>
-                            <span className="text-[10px] text-gray-400">{new Date(yorum.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'})}</span>
+                {konular?.map((konu) => (
+                    <div key={konu.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded font-bold uppercase">
+                                {konu.kategori}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                                {new Date(konu.created_at).toLocaleDateString('tr-TR')}
+                            </span>
                         </div>
-                        <p className="text-sm text-gray-700">{yorum.icerik}</p>
+                        
+                        <h3 className="font-bold text-gray-800 text-sm mb-1">{konu.baslik}</h3>
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-3">{konu.icerik}</p>
+                        
+                        <div className="flex items-center justify-between border-t border-gray-50 pt-3">
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <User className="w-3 h-3" />
+                                </div>
+                                {konu.yazar_ad || 'Anonim'}
+                            </div>
+                            
+                            {/* İŞTE BU LİNK SENİ DETAY SAYFASINA VE YORUM ALANINA GÖTÜRÜR */}
+                            <Link 
+                                href={`/forum/${konu.id}`} 
+                                className="text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline"
+                            >
+                                Yorum Yap &rarr;
+                            </Link>
+                        </div>
                     </div>
                 ))}
 
-                {(!yorumlar || yorumlar.length === 0) && (
-                    <p className="text-center text-gray-400 text-xs py-4">Henüz yorum yok. İlk yorumu sen yap!</p>
+                {(!konular || konular.length === 0) && (
+                    <div className="text-center py-10 text-gray-400 text-sm">
+                        Henüz konu açılmamış. İlk soruyu sen sor!
+                    </div>
                 )}
             </div>
         </div>
-
-        {/* --- YORUM YAPMA ALANI (SABİT ALT BAR) --- */}
-        <div className="fixed bottom-0 left-0 w-full bg-white p-4 border-t border-gray-100 z-20">
-            <div className="max-w-md mx-auto">
-                {/* Yorum Formunu Buraya Koyuyoruz */}
-                <YorumFormu konuId={konuId} />
-            </div>
-        </div>
-
-    </div>
+    </main>
   );
 }
