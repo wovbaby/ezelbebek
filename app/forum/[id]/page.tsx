@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, User, MessageCircle, Clock } from 'lucide-react';
-import YorumFormu from '@/components/YorumFormu'; // Az önceki bileşen
+import YorumFormu from '@/components/YorumFormu'; 
 
 export const revalidate = 0;
 
