@@ -10,7 +10,6 @@ export const revalidate = 0;
 export default async function Home() {
   const cookieStore = await cookies();
 
-  // 1. Supabase Client Oluştur
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -22,23 +21,44 @@ export default async function Home() {
     }
   );
 
-  // 2. Kullanıcı Kontrolü
+  // 1. Kullanıcı Kontrolü
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  
+  if (!user) {
+    console.log("❌ Kullanıcı bulunamadı, Login'e atılıyor.");
+    redirect('/login');
+  }
 
-  // 3. Güvenlik (Onay) Kontrolü - BEKÇİ
-  const { data: profil } = await supabase
+  // --- DEDEKTİF BAŞLANGICI ---
+  console.log("------------------------------------------------");
+  console.log("👤 Giriş Yapan User ID:", user.id);
+  console.log("📧 Email:", user.email);
+
+  // 2. Güvenlik (Onay) Kontrolü
+  const { data: profil, error: profilHata } = await supabase
     .from('profiles')
-    .select('onayli_mi')
+    .select('*') // Tüm veriyi görelim
     .eq('id', user.id)
     .single();
 
-  // Profil yoksa veya onaylı değilse -> Bekleme odasına
-  if (!profil || profil.onayli_mi !== true) {
-      redirect('/beklemede');
+  console.log("🔍 Veritabanından Gelen Profil:", profil);
+  
+  if (profilHata) {
+      console.error("🚨 Profil Çekme Hatası:", profilHata.message);
   }
 
-  // 4. Bebekleri Getir (Sadece bu kullanıcının)
+  // Profil yoksa veya onaylı değilse
+  if (!profil || profil.onayli_mi !== true) {
+      console.log("⛔ ERİŞİM REDDEDİLDİ -> Bekleme Odasına Atılıyor.");
+      console.log("Sebep: ", !profil ? "Profil Yok" : "Onaylı Değil (False)");
+      redirect('/beklemede');
+  } else {
+      console.log("✅ ERİŞİM ONAYLANDI -> Ana Sayfa Açılıyor.");
+  }
+  console.log("------------------------------------------------");
+  // --- DEDEKTİF BİTİŞİ ---
+
+  // 3. Bebekleri Getir
   const { data: tumBebekler } = await supabase
     .from('bebekler')
     .select('id, ad, resim_url')
@@ -46,17 +66,16 @@ export default async function Home() {
 
   const bebekler = tumBebekler || [];
 
-  // 5. Aktif Bebeği Belirle (MANTIK GÜÇLENDİRİLDİ)
+  // 4. Seçili Bebeği Belirle
   let seciliId = Number(cookieStore.get('secili_bebek')?.value);
   
-  // Eğer çerezdeki ID geçerli değilse veya listede yoksa, ilk bebeği seç
   if (!seciliId || !bebekler.find(b => b.id === seciliId)) {
       seciliId = bebekler.length > 0 ? bebekler[0].id : 0;
   }
   
   const seciliBebek = bebekler.find(b => b.id === seciliId);
 
-  // 6. Aktiviteleri Getir (Hata Korumalı)
+  // 5. Aktiviteleri Getir
   let aktiviteler = [];
   if (seciliId > 0) {
     const { data, error } = await supabase
@@ -77,7 +96,6 @@ export default async function Home() {
       {/* --- HEADER --- */}
       <header className="flex-none h-64 relative z-40 rounded-b-[2.5rem] overflow-hidden shadow-xl bg-blue-600">
         
-        {/* Arkaplan Resmi */}
         {seciliBebek?.resim_url ? (
             <img 
                 src={seciliBebek.resim_url} 
@@ -90,18 +108,13 @@ export default async function Home() {
             </div>
         )}
 
-        {/* Karartma */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/30"></div>
 
-        {/* İÇERİK */}
         <div className="absolute inset-0 flex flex-col justify-between p-6 pt-12">
-            
-            {/* BEBEK SEÇİCİ */}
             <div className="self-start"> 
                  <BebekSecici bebekler={bebekler} seciliId={seciliId} />
             </div>
 
-            {/* İSİM */}
             <div className="text-center text-white mb-2">
                 <h2 className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">Hoş Geldin</h2>
                 <h1 className="text-4xl font-bold tracking-tight drop-shadow-md">{seciliBebek?.ad || "Bebek Ekle"}</h1>
@@ -109,10 +122,9 @@ export default async function Home() {
         </div>
       </header>
 
-      {/* --- İÇERİK ALANI --- */}
+      {/* --- İÇERİK --- */}
       <div className="flex-1 overflow-y-auto relative z-30 scrollbar-hide">
         
-        {/* HIZLI İŞLEM MENÜSÜ */}
         {seciliBebek && (
           <div className="sticky top-0 z-50 px-5 pt-6 pb-2 bg-gray-50/95 backdrop-blur-sm transition-all">
               <div className="origin-top"> 
@@ -121,7 +133,6 @@ export default async function Home() {
           </div>
         )}
 
-        {/* LOG LİSTESİ */}
         <div className="px-6 pb-32 mt-2">
             <h3 className="text-gray-800 font-bold text-md mb-3 flex items-center gap-2 ml-1">
                 Bugünün Hareketleri
@@ -166,7 +177,6 @@ export default async function Home() {
                 )}
             </div>
         </div>
-
       </div>
     </main>
   );
