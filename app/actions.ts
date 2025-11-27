@@ -264,19 +264,8 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   
   const yazarAdi = user?.email?.split('@')[0] || 'Anonim Anne';
   
-  const { error } = await supabase.from('forum_konulari').insert([{ 
-      baslik, 
-      icerik, 
-      kategori, 
-      yazar_ad: yazarAdi, 
-      user_id: user.id 
-  }]);
-  
-  if (error) {
-      console.error("Konu ekleme hatası:", error);
-      return false;
-  }
-  
+  const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: yazarAdi, user_id: user.id }]);
+  if (error) return false;
   revalidatePath('/forum');
   return true;
 }
@@ -284,7 +273,6 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
 export async function ilanEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
-  
   if (!user) return { success: false, error: "Oturum açmanız gerekiyor." };
 
   const baslik = formData.get('baslik') as string;
@@ -294,7 +282,6 @@ export async function ilanEkle(formData: FormData) {
   const ilce = formData.get('ilce') as string;
   const durum = formData.get('durum') as string;
   const iletisim = formData.get('iletisim') as string;
-  
   const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
 
   if (!baslik || isNaN(fiyat) || !sehir) return { success: false, error: "Zorunlu alanlar eksik." };
@@ -321,12 +308,8 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
   if (!user) throw new Error("Giriş yapmalısın");
 
   const timestamp = Math.round(new Date().getTime() / 1000);
-  
   const signature = cloudinary.utils.api_sign_request(
-    {
-      timestamp: timestamp,
-      folder: folderName, 
-    },
+    { timestamp, folder: folderName },
     process.env.CLOUDINARY_API_SECRET!
   );
 
@@ -337,16 +320,8 @@ export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
-  const { error } = await supabase.from('medya_kutusu').insert([{
-    user_id: user.id,
-    baslik,
-    dosya_url: dosyaUrl,
-    tip, 
-    süre: sure
-  }]);
-
-  if (error) { console.error("DB Kayıt hatası:", error); return false; }
+  const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
+  if (error) return false;
   revalidatePath('/medya');
   return true;
 }
@@ -361,22 +336,20 @@ export async function medyaSil(id: number) {
 }
 
 // ==========================================
-//              YORUM İŞLEMLERİ
+//              YORUM İŞLEMLERİ (GÜNCELLENDİ)
 // ==========================================
 
 export async function yorumEkle(konuId: number, icerik: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   
-  // 1. Giriş Kontrolü
   if (!user) {
-      console.error("Yorum Hatası: Kullanıcı giriş yapmamış.");
-      return false;
+    console.error("Yorum Hatası: Kullanıcı giriş yapmamış.");
+    return { success: false, error: "Lütfen giriş yapın." };
   }
 
   const yazarAdi = user.email?.split('@')[0] || 'Anonim';
 
-  // 2. Kayıt İşlemi
   const { error } = await supabase.from('forum_yorumlari').insert([{
     konu_id: konuId,
     icerik: icerik,
@@ -384,13 +357,12 @@ export async function yorumEkle(konuId: number, icerik: string) {
     yazar_ad: yazarAdi
   }]);
 
-  // 3. Hata Kontrolü ve Loglama
   if (error) {
-    console.error("Supabase Yorum Hatası:", error.message); // Vercel loglarında görünür
-    return false;
+    // HATA MESAJINI KONSOLA BASIYORUZ
+    console.error("Supabase Yorum Hatası DETAY:", error.message); 
+    return { success: false, error: error.message }; // Hatayı client'a döndür
   }
   
-  // 4. Sayfayı Yenile
   revalidatePath(`/forum/${konuId}`); 
-  return true;
+  return { success: true };
 }

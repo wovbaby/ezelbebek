@@ -11,31 +11,26 @@ export default function YorumFormu({ konuId }: { konuId: number }) {
   const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 1. Kontrol: Butona basıldı mı?
-    console.log("Butona basıldı. Yorum:", yorum);
-
     if (!yorum.trim()) {
-        alert("Boş yorum gönderilemez.");
+        alert("Lütfen bir şeyler yazın.");
         return;
     }
 
     setYukleniyor(true);
     try {
-        // 2. Server Action çağrılıyor
-        console.log("Sunucuya gönderiliyor...");
         const sonuc = await yorumEkle(konuId, yorum);
         
-        if (sonuc) {
-            console.log("Başarılı!");
-            setYorum(''); // Kutuyu temizle
-            // Sayfa action içindeki revalidatePath ile yenilenecek
+        // Sonuç kontrolü (actions.ts'deki yeni yapıya uygun)
+        if (sonuc && typeof sonuc === 'object' && 'success' in sonuc && sonuc.success) {
+            setYorum(''); // Başarılı
         } else {
-            console.error("Sunucu false döndürdü.");
-            alert("Yorum kaydedilemedi. Giriş yaptığınızdan emin olun.");
+            // Hata mesajını göster
+            const hataMesaji = (sonuc && typeof sonuc === 'object' && 'error' in sonuc) ? sonuc.error : "Bir hata oluştu.";
+            alert("HATA: " + hataMesaji);
         }
     } catch (err) {
-        console.error("Hata oluştu:", err);
-        alert("Beklenmedik bir hata oluştu.");
+        console.error(err);
+        alert("Bağlantı hatası oluştu.");
     } finally {
         setYukleniyor(false);
     }
@@ -43,10 +38,7 @@ export default function YorumFormu({ konuId }: { konuId: number }) {
 
   return (
     <div className="mt-4">
-        <form 
-            onSubmit={gonder} 
-            className="relative flex items-center gap-2"
-        >
+        <form onSubmit={gonder} className="relative flex items-center gap-2">
           <label htmlFor="yorum" className="sr-only">Yorum Yap</label>
           <input 
             type="text" 
@@ -60,16 +52,15 @@ export default function YorumFormu({ konuId }: { konuId: number }) {
             autoComplete="off"
           />
           
-          {/* Type="submit" olduğundan emin ol ve disabled şartını kaldırdım */}
           <button 
             type="submit" 
-            className="absolute right-2 top-2 bottom-2 aspect-square bg-purple-600 text-white rounded-xl hover:bg-purple-700 active:scale-95 transition-all flex items-center justify-center"
+            disabled={yukleniyor || !yorum.trim()}
+            className="absolute right-2 top-2 bottom-2 aspect-square bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
             aria-label="Gönder"
           >
             {yukleniyor ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
           </button>
         </form>
-        {/* Kullanıcıya not: Giriş yapmadıysa uyarı ver */}
         <p className="text-[10px] text-gray-400 mt-2 ml-2">
             Yorum yapmak için giriş yapmış olmalısınız.
         </p>
