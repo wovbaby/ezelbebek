@@ -370,3 +370,30 @@ export async function medyaSil(id: number) {
   revalidatePath('/medya');
   return true;
 }
+// --- YORUM EKLEME FONKSİYONU (app/actions.ts en altına ekle) ---
+
+export async function yorumEkle(konuId: number, icerik: string) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return false;
+
+  // Kullanıcı adını e-postadan alıyoruz (örn: ahmet@gmail.com -> ahmet)
+  const yazarAdi = user.email?.split('@')[0] || 'Anonim';
+
+  const { error } = await supabase.from('forum_yorumlari').insert([{
+    konu_id: konuId,
+    icerik: icerik,
+    user_id: user.id,
+    yazar_ad: yazarAdi
+  }]);
+
+  if (error) {
+    console.error("Yorum hatası:", error);
+    return false;
+  }
+  
+  // Yorum yapılan konunun sayfasını yenile ki yorum hemen görünsün
+  revalidatePath(`/forum/${konuId}`); 
+  return true;
+}
