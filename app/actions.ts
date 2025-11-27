@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- CLOUDINARY AYARLARI ---
+// --- 1. CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -13,7 +13,7 @@ cloudinary.config({
   secure: true,
 });
 
-// --- YARDIMCI: SUPABASE CLIENT ---
+// --- 2. YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,32 +32,11 @@ async function getSupabaseClient() {
     );
 }
 
-// --- YARDIMCI: SEÇİLİ BEBEK ID (AKILLI VERSİYON) ---
-// Sorunu çözen kısım burası: Cookie yoksa DB'den ilk bebeği bulur.
+// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
-  
-  // 1. Eğer çerezde ID varsa onu kullan
-  if (seciliId) return parseInt(seciliId);
-
-  // 2. Çerez yoksa, veritabanına git ve kullanıcının ilk bebeğini bul
-  const supabase = await getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (user) {
-     const { data } = await supabase
-        .from('bebekler')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('id', { ascending: true }) // İlk eklenen bebek
-        .limit(1)
-        .single();
-     
-     if (data) return data.id;
-  }
-
-  return 0; // Hiç bebek yoksa
+  return seciliId ? parseInt(seciliId) : 0; 
 }
 
 // ==========================================
@@ -105,10 +84,7 @@ export async function yeniBebekEkle(formData: FormData) {
   }]);
 
   if (error) return false;
-  
-  // Bebek eklendikten sonra ana sayfayı ve profil sayfasını yenile
-  revalidatePath('/profil'); 
-  revalidatePath('/');
+  revalidatePath('/profil'); revalidatePath('/');
   return true;
 }
 
@@ -155,18 +131,10 @@ export async function profilGuncelle(formData: FormData) {
 export async function aktiviteEkle(tip: string, detay: string) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
-  
-  // Eğer bebek ID bulunamazsa işlem yapma
-  if (!bebekId || bebekId === 0) return false;
-  
+  if (!bebekId) return false;
   const { error } = await supabase.from('aktiviteler').insert([{ bebek_id: bebekId, tip, detay }]);
-  
-  if (error) {
-      console.error("Aktivite ekleme hatası:", error);
-      return false;
-  }
-  
-  revalidatePath('/'); // Ana sayfayı yenile
+  if (error) return false;
+  revalidatePath('/');
   return true;
 }
 
@@ -295,8 +263,20 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   if(!user) return false;
   
   const yazarAdi = user?.email?.split('@')[0] || 'Anonim Anne';
-  const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: yazarAdi, user_id: user.id }]);
-  if (error) return false;
+  
+  const { error } = await supabase.from('forum_konulari').insert([{ 
+      baslik, 
+      icerik, 
+      kategori, 
+      yazar_ad: yazarAdi, 
+      user_id: user.id 
+  }]);
+  
+  if (error) {
+      console.error("Konu ekleme hatası:", error);
+      return false;
+  }
+  
   revalidatePath('/forum');
   return true;
 }
@@ -341,6 +321,7 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
   if (!user) throw new Error("Giriş yapmalısın");
 
   const timestamp = Math.round(new Date().getTime() / 1000);
+  
   const signature = cloudinary.utils.api_sign_request(
     {
       timestamp: timestamp,
@@ -356,8 +337,16 @@ export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-  const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
-  if (error) return false;
+
+  const { error } = await supabase.from('medya_kutusu').insert([{
+    user_id: user.id,
+    baslik,
+    dosya_url: dosyaUrl,
+    tip, 
+    süre: sure
+  }]);
+
+  if (error) { console.error("DB Kayıt hatası:", error); return false; }
   revalidatePath('/medya');
   return true;
 }
@@ -370,17 +359,24 @@ export async function medyaSil(id: number) {
   revalidatePath('/medya');
   return true;
 }
-// --- YORUM EKLEME FONKSİYONU (app/actions.ts en altına ekle) ---
+
+// ==========================================
+//              YORUM İŞLEMLERİ
+// ==========================================
 
 export async function yorumEkle(konuId: number, icerik: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   
-  if (!user) return false;
+  // 1. Giriş Kontrolü
+  if (!user) {
+      console.error("Yorum Hatası: Kullanıcı giriş yapmamış.");
+      return false;
+  }
 
-  // Kullanıcı adını e-postadan alıyoruz (örn: ahmet@gmail.com -> ahmet)
   const yazarAdi = user.email?.split('@')[0] || 'Anonim';
 
+  // 2. Kayıt İşlemi
   const { error } = await supabase.from('forum_yorumlari').insert([{
     konu_id: konuId,
     icerik: icerik,
@@ -388,12 +384,13 @@ export async function yorumEkle(konuId: number, icerik: string) {
     yazar_ad: yazarAdi
   }]);
 
+  // 3. Hata Kontrolü ve Loglama
   if (error) {
-    console.error("Yorum hatası:", error);
+    console.error("Supabase Yorum Hatası:", error.message); // Vercel loglarında görünür
     return false;
   }
   
-  // Yorum yapılan konunun sayfasını yenile ki yorum hemen görünsün
+  // 4. Sayfayı Yenile
   revalidatePath(`/forum/${konuId}`); 
   return true;
 }
