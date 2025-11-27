@@ -5,15 +5,15 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- 1. CLOUDINARY AYARLARI ---
+// --- CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY, // .env.local dosyasındaki server-side key
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
 
-// --- 2. YARDIMCI: SUPABASE CLIENT ---
+// --- YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,7 +32,7 @@ async function getSupabaseClient() {
     );
 }
 
-// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
+// --- YARDIMCI: SEÇİLİ BEBEK ID ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
@@ -62,7 +62,6 @@ export async function yeniBebekEkle(formData: FormData) {
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
-  // Küçük resimler için sunucu tarafı yükleme (Opsiyonel)
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
@@ -167,7 +166,7 @@ export async function atesEkle(formData: FormData) {
   const ilac = formData.get('ilac') as string;
   const notlar = formData.get('notlar') as string;
   const { error } = await supabase.from('ates_takibi').insert([{ 
-      bebek_id: bebekId, derece, olcum_yeri, ilac, notlar 
+      bebek_id: bebekId, derece: parseFloat(derece), olcum_yeri, ilac, notlar 
   }]);
   if (error) return false;
   revalidatePath('/saglik/ates');
@@ -254,7 +253,7 @@ export async function kaloriEkle(miktar: number) {
 //            FORUM & MARKET
 // ==========================================
 
-// --- FORUM KONUSU EKLEME (BU EKSİKTİ, ARTIK VAR) ---
+// --- FORUM KONUSU EKLE (Artık burada!) ---
 export async function konuEkle(baslik: string, icerik: string, kategori: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -279,7 +278,7 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   return true;
 }
 
-// --- İLAN EKLEME (DIRECT UPLOAD GÜNCELLEMESİ) ---
+// --- MARKET İLANI EKLE ---
 export async function ilanEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -287,26 +286,19 @@ export async function ilanEkle(formData: FormData) {
   if (!user) return { success: false, error: "Oturum açmanız gerekiyor." };
 
   const baslik = formData.get('baslik') as string;
-  const fiyatRaw = formData.get('fiyat') as string;
-  const fiyat = parseFloat(fiyatRaw);
+  const fiyat = parseFloat(formData.get('fiyat') as string);
   const kategori = formData.get('kategori') as string;
   const sehir = formData.get('sehir') as string;
   const ilce = formData.get('ilce') as string;
   const durum = formData.get('durum') as string;
   const iletisim = formData.get('iletisim') as string;
   
-  // Frontend'den gelen URL'yi alıyoruz
   const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
 
   if (!baslik || isNaN(fiyat) || !sehir) return { success: false, error: "Zorunlu alanlar eksik." };
 
   const { error } = await supabase.from('urunler').insert([{ 
-      baslik, 
-      fiyat, 
-      kategori, 
-      sehir, 
-      ilce, 
-      durum, 
+      baslik, fiyat, kategori, sehir, ilce, durum, 
       resim_url: resimUrl, 
       iletisim: iletisim || 'Belirtilmedi',
       user_id: user.id
@@ -341,8 +333,16 @@ export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-  const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
-  if (error) return false;
+
+  const { error } = await supabase.from('medya_kutusu').insert([{
+    user_id: user.id,
+    baslik,
+    dosya_url: dosyaUrl,
+    tip, 
+    süre: sure
+  }]);
+
+  if (error) { console.error("DB Kayıt hatası:", error); return false; }
   revalidatePath('/medya');
   return true;
 }

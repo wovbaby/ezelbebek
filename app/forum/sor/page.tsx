@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { konuEkle } from '@/app/actions'; // Artık actions.ts içinde mevcut
+import { konuEkle } from '@/app/actions'; 
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
