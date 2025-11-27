@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation'; // Yönlendirme için
+import { redirect } from 'next/navigation';
 import { Baby, Utensils, Moon, Wind } from 'lucide-react';
 import HizliIslem from '@/components/HizliIslem';
 import BebekSecici from '@/components/BebekSecici';
@@ -26,22 +26,22 @@ export default async function Home() {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    redirect('/login'); // Giriş yapmamışsa login'e at
+    redirect('/login');
   }
 
-  // --- GÜVENLİK KONTROLÜ (YENİ EKLENDİ) ---
-  // Kullanıcının onay durumuna bakıyoruz
+  // --- GÜVENLİK KONTROLÜ (DÜZELTİLDİ: KESİN ENGEL) ---
   const { data: profil } = await supabase
     .from('profiles')
     .select('onayli_mi')
     .eq('id', user.id)
     .single();
 
-  // Eğer profil var ve onaylanmamışsa -> Bekleme odasına postala
-  if (profil && profil.onayli_mi === false) {
+  // Profil hiç yoksa (Trigger çalışmadıysa) VEYA onaylı değilse -> Bekleme odasına
+  // 'profil?.onayli_mi !== true' demek: false ise de at, null ise de at, yoksa da at.
+  if (!profil || profil.onayli_mi !== true) {
       redirect('/beklemede');
   }
-  // -----------------------------------------
+  // --------------------------------------------------
 
   // 3. Bebekleri Getir (Sadece bu kullanıcının)
   const { data: tumBebekler } = await supabase
