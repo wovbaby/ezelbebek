@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import ProfilForm from '@/components/ProfilForm';
-import { Trophy, Star, Settings, LogOut, Plus, Baby } from 'lucide-react'; // Baby ikonunu ekledim
+import { Trophy, Star, Settings, LogOut, Plus, Baby, ShieldCheck } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -19,9 +19,7 @@ async function cikisYap() {
       cookies: {
         getAll() { return cookieStore.getAll() },
         setAll(cookiesToSet) {
-           try {
-             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-           } catch {}
+           try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
         },
       },
     }
@@ -32,10 +30,9 @@ async function cikisYap() {
 }
 
 export default async function ProfilPage() {
-  // 1. Çerezleri Al
   const cookieStore = await cookies();
 
-  // 2. Güvenli Supabase İstemcisi
+  // 1. Güvenli Supabase İstemcisi
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -43,19 +40,27 @@ export default async function ProfilPage() {
       cookies: {
         getAll() { return cookieStore.getAll() },
         setAll(cookiesToSet) {
-           try {
-             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-           } catch {}
+           try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
         },
       },
     }
   );
 
-  // 3. Kullanıcı Kontrolü
+  // 2. Kullanıcı Kontrolü
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     redirect('/login');
   }
+
+  // 3. Admin Kontrolü (YENİ EKLENDİ)
+  // Kullanıcının rolünü 'profiles' tablosundan çekiyoruz
+  const { data: profil } = await supabase
+    .from('profiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single();
+  
+  const isAdmin = profil?.rol === 'admin';
 
   // 4. Sadece Bu Kullanıcıya Ait Bebekleri Getir
   const { data: bebekler } = await supabase
@@ -64,24 +69,23 @@ export default async function ProfilPage() {
     .eq('user_id', user.id)
     .order('id');
 
-  // --- YENİ EKLENDİ: Sadece Bu Kullanıcıya Ait Anneyi Getir ---
+  // 5. Sadece Bu Kullanıcıya Ait Anneyi Getir
   let { data: anne } = await supabase
     .from('anne_profili')
     .select('*')
     .eq('user_id', user.id)
     .single();
 
-  // Eğer anne profili henüz yoksa varsayılan boş obje oluştur (Hata vermesin diye)
   if (!anne) {
       anne = { ad: 'Anne', su_hedefi: 2000, resim_url: null };
   }
   
-  // 5. Seçili ve Aktif Bebeği Belirle
+  // 6. Seçili ve Aktif Bebeği Belirle
   const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
   const aktifId = (seciliId && bebekler?.find(b => b.id === seciliId)) ? seciliId : bebekler?.[0]?.id;
   const seciliBebek = bebekler?.find(b => b.id === aktifId) || bebekler?.[0];
 
-  // 6. İstatistikler
+  // 7. İstatistikler
   let mamaSayisi = 0, bezSayisi = 0, uykuSayisi = 0, ilanSayisi = 0;
 
   if (aktifId) {
@@ -134,8 +138,7 @@ export default async function ProfilPage() {
                 )}
             </div>
 
-            {/* --- YENİ: ANNE PROFİL KARTI --- */}
-            {/* Anne Profilini buraya ekliyoruz ki kullanıcı kendi resmini görsün */}
+            {/* Anne Profil Kartı */}
             <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {anne?.resim_url ? (
@@ -155,14 +158,14 @@ export default async function ProfilPage() {
                 </Link>
             </div>
             
-            {/* KART 1: Bebek Künyesi */}
+            {/* Bebek Künyesi Formu */}
             {seciliBebek ? (
                 <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 border border-gray-100">
                     <ProfilForm bebek={seciliBebek} />
                 </div>
             ) : null}
 
-            {/* KART 2: İstatistikler */}
+            {/* İstatistikler */}
             <div className="mb-6">
                 <h3 className="text-gray-800 font-bold text-sm mb-3 ml-2 flex items-center gap-2">
                     <Trophy className="w-4 h-4 text-yellow-500" />
@@ -176,8 +179,17 @@ export default async function ProfilPage() {
                 </div>
             </div>
 
-            {/* KART 3: Menü ve Çıkış */}
+            {/* MENÜ */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+                
+                {/* --- YÖNETİM BUTONU (SADECE ADMİNLERE GÖRÜNÜR) --- */}
+                {isAdmin && (
+                    <Link href="/yonetim" className="w-full p-4 flex items-center gap-3 text-sm font-bold bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors border-b border-orange-100">
+                        <ShieldCheck className="w-5 h-5" />
+                        Yönetim Paneli (Onay)
+                    </Link>
+                )}
+
                 <MenuItem icon={Star} label="Premium'a Geç" />
                 <MenuItem icon={Settings} label="Uygulama Ayarları" />
                 <div className="border-t border-gray-100"></div>
@@ -192,7 +204,7 @@ export default async function ProfilPage() {
             </div>
 
             <p className="text-center text-[10px] text-gray-400 mt-8 mb-4">
-                Ezel Bebek v1.2.0
+                Ezel Bebek v1.3.0
             </p>
 
         </div>
@@ -200,7 +212,7 @@ export default async function ProfilPage() {
   );
 }
 
-// Helper bileşenler aynı
+// Yardımcı Bileşenler
 function StatCard({ label, value, color }: any) {
     return (
         <div className={`p-4 rounded-2xl ${color} flex flex-col items-center justify-center`}>
