@@ -397,3 +397,62 @@ export async function yorumEkle(konuId: number, icerik: string) {
   revalidatePath(`/forum/${konuId}`); 
   return true;
 }
+
+// ... (Diğer kodların altına ekle) ...
+
+// ==========================================
+//              YORUM İŞLEMLERİ
+// ==========================================
+
+export async function yorumEkle(konuId: number, icerik: string) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return false;
+
+  // Kullanıcı adını al
+  const yazarAdi = user.email?.split('@')[0] || 'Anonim';
+
+  const { error } = await supabase.from('forum_yorumlari').insert([{
+    konu_id: konuId,
+    icerik: icerik,
+    user_id: user.id,
+    yazar_ad: yazarAdi
+  }]);
+
+  if (error) {
+    console.error("Yorum ekleme hatası:", error);
+    return false;
+  }
+  
+  // Sayfayı yenile
+  revalidatePath(`/forum/${konuId}`); 
+  return true;
+}
+```
+
+### 2. Adım: Veritabanı İzinlerini Aç (Supabase SQL)
+Kodun doğru olsa bile, veritabanı "Yazmaya iznin yok" diyorsa hata verir. Bunu düzeltmek için:
+
+1.  **Supabase Paneli > SQL Editor**'e git.
+2.  Şu kodu yapıştır ve **Run** butonuna bas:
+
+```sql
+-- 1. Yorumlar tablosunun güvenliğini (RLS) aç
+ALTER TABLE forum_yorumlari ENABLE ROW LEVEL SECURITY;
+
+-- 2. Eski kuralları temizle (Hata verirse sorun değil, devam et)
+DROP POLICY IF EXISTS "Herkes okuyabilir" ON forum_yorumlari;
+DROP POLICY IF EXISTS "Üyeler yazabilir" ON forum_yorumlari;
+
+-- 3. Okuma İzni (Herkes okusun)
+CREATE POLICY "Herkes okuyabilir"
+ON forum_yorumlari FOR SELECT
+TO public
+USING (true);
+
+-- 4. Yazma İzni (Giriş yapan herkes yorum yazabilsin)
+CREATE POLICY "Üyeler yazabilir"
+ON forum_yorumlari FOR INSERT
+TO authenticated
+WITH CHECK (true);
