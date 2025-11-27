@@ -5,15 +5,15 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- CLOUDINARY AYARLARI ---
+// --- 1. CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY, // .env.local dosyasındaki server-side key
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
 
-// --- YARDIMCI: SUPABASE CLIENT ---
+// --- 2. YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,84 +32,11 @@ async function getSupabaseClient() {
     );
 }
 
-// --- DİĞER YARDIMCILAR ---
+// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
   return seciliId ? parseInt(seciliId) : 0; 
-}
-
-// ==========================================
-//              MARKET İŞLEMLERİ (DÜZELTİLDİ)
-// ==========================================
-
-// İLAN EKLEME (ARTIK URL ALIYOR, DOSYA DEĞİL)
-export async function ilanEkle(formData: FormData) {
-  const supabase = await getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-      return { success: false, error: "Oturum açmanız gerekiyor." };
-  }
-
-  const baslik = formData.get('baslik') as string;
-  // Fiyatı güvenli şekilde sayıya çeviriyoruz
-  const fiyatRaw = formData.get('fiyat') as string;
-  const fiyat = parseFloat(fiyatRaw);
-
-  const kategori = formData.get('kategori') as string;
-  const sehir = formData.get('sehir') as string;
-  const ilce = formData.get('ilce') as string;
-  const durum = formData.get('durum') as string;
-  const iletisim = formData.get('iletisim') as string;
-  
-  // DÜZELTME: Dosya yükleme kodu silindi. Artık frontend'den gelen URL'i alıyoruz.
-  const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
-
-  // Zorunlu alan kontrolü
-  if (!baslik || isNaN(fiyat) || !sehir) {
-      return { success: false, error: "Başlık, Fiyat ve Şehir zorunludur." };
-  }
-
-  const { error } = await supabase.from('urunler').insert([{ 
-      baslik, 
-      fiyat, 
-      kategori, 
-      sehir, 
-      ilce, 
-      durum, 
-      resim_url: resimUrl, 
-      iletisim: iletisim || 'Belirtilmedi',
-      user_id: user.id
-  }]);
-
-  if (error) {
-      console.error("İlan ekleme hatası:", error);
-      return { success: false, error: error.message };
-  }
-
-  revalidatePath('/takas');
-  return { success: true };
-}
-
-// --- CLOUDINARY İMZA (Medya ve Market için Ortak) ---
-export async function getCloudinarySignature() {
-  const supabase = await getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Giriş yapmalısın");
-
-  const timestamp = Math.round(new Date().getTime() / 1000);
-  
-  // İmza oluşturma
-  const signature = cloudinary.utils.api_sign_request(
-    {
-      timestamp: timestamp,
-      folder: 'bebek-pwa-urunler', // Varsayılan klasör
-    },
-    process.env.CLOUDINARY_API_SECRET!
-  );
-
-  return { timestamp, signature };
 }
 
 // ==========================================
@@ -135,6 +62,7 @@ export async function yeniBebekEkle(formData: FormData) {
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
+  // Küçük resimler için sunucu tarafı yükleme (Opsiyonel)
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
@@ -149,7 +77,13 @@ export async function yeniBebekEkle(formData: FormData) {
     } catch (error) { console.error("Bebek resim hatası:", error); }
   }
 
-  const { error } = await supabase.from('bebekler').insert([{ ad, dogum_tarihi, cinsiyet, boy, kilo, resim_url: resimUrl, user_id: user.id }]);
+  const { error } = await supabase.from('bebekler').insert([{ 
+      ad, dogum_tarihi, cinsiyet, 
+      boy: parseFloat(boy)||0, kilo: parseFloat(kilo)||0, 
+      resim_url: resimUrl, 
+      user_id: user.id 
+  }]);
+
   if (error) return false;
   revalidatePath('/profil'); revalidatePath('/');
   return true;
@@ -191,7 +125,6 @@ export async function profilGuncelle(formData: FormData) {
   return true;
 }
 
-// --- Günlük Takip ---
 export async function aktiviteEkle(tip: string, detay: string) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
@@ -233,13 +166,18 @@ export async function atesEkle(formData: FormData) {
   const olcum_yeri = formData.get('olcum_yeri') as string;
   const ilac = formData.get('ilac') as string;
   const notlar = formData.get('notlar') as string;
-  const { error } = await supabase.from('ates_takibi').insert([{ bebek_id: bebekId, derece, olcum_yeri, ilac, notlar }]);
+  const { error } = await supabase.from('ates_takibi').insert([{ 
+      bebek_id: bebekId, derece, olcum_yeri, ilac, notlar 
+  }]);
   if (error) return false;
   revalidatePath('/saglik/ates');
   return true;
 }
 
-// --- Anne Profili ---
+// ==========================================
+//              ANNE PROFİLİ
+// ==========================================
+
 export async function anneGuncelle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -312,17 +250,104 @@ export async function kaloriEkle(miktar: number) {
   return true;
 }
 
-// --- MEDYA ---
+// ==========================================
+//            FORUM & MARKET
+// ==========================================
+
+// --- FORUM KONUSU EKLEME (BU EKSİKTİ, ARTIK VAR) ---
+export async function konuEkle(baslik: string, icerik: string, kategori: string) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if(!user) return false;
+  
+  const yazarAdi = user?.email?.split('@')[0] || 'Anonim Anne';
+  
+  const { error } = await supabase.from('forum_konulari').insert([{ 
+      baslik, 
+      icerik, 
+      kategori, 
+      yazar_ad: yazarAdi, 
+      user_id: user.id 
+  }]);
+  
+  if (error) {
+      console.error("Konu ekleme hatası:", error);
+      return false;
+  }
+  
+  revalidatePath('/forum');
+  return true;
+}
+
+// --- İLAN EKLEME (DIRECT UPLOAD GÜNCELLEMESİ) ---
+export async function ilanEkle(formData: FormData) {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return { success: false, error: "Oturum açmanız gerekiyor." };
+
+  const baslik = formData.get('baslik') as string;
+  const fiyatRaw = formData.get('fiyat') as string;
+  const fiyat = parseFloat(fiyatRaw);
+  const kategori = formData.get('kategori') as string;
+  const sehir = formData.get('sehir') as string;
+  const ilce = formData.get('ilce') as string;
+  const durum = formData.get('durum') as string;
+  const iletisim = formData.get('iletisim') as string;
+  
+  // Frontend'den gelen URL'yi alıyoruz
+  const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
+
+  if (!baslik || isNaN(fiyat) || !sehir) return { success: false, error: "Zorunlu alanlar eksik." };
+
+  const { error } = await supabase.from('urunler').insert([{ 
+      baslik, 
+      fiyat, 
+      kategori, 
+      sehir, 
+      ilce, 
+      durum, 
+      resim_url: resimUrl, 
+      iletisim: iletisim || 'Belirtilmedi',
+      user_id: user.id
+  }]);
+
+  if (error) return { success: false, error: error.message };
+  revalidatePath('/takas');
+  return { success: true };
+}
+
+// ==========================================
+//        MEDYA (DIRECT UPLOAD)
+// ==========================================
+
+// 1. İMZA ALMA
+export async function getCloudinarySignature() {
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Giriş yapmalısın");
+
+  const timestamp = Math.round(new Date().getTime() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    { timestamp, folder: 'bebek-medya' },
+    process.env.CLOUDINARY_API_SECRET!
+  );
+
+  return { timestamp, signature };
+}
+
+// 2. MEDYA KAYIT
 export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string, tip: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
   const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
-  if (error) { console.error("DB Kayıt hatası:", error); return false; }
+  if (error) return false;
   revalidatePath('/medya');
   return true;
 }
 
+// 3. MEDYA SİLME
 export async function medyaSil(id: number) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
