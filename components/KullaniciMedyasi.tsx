@@ -9,10 +9,12 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
   const [calanId, setCalanId] = useState<number | null>(null);
   const [mod, setMod] = useState<'liste' | 'kayit' | 'yukle'>('liste');
   
+  // Kayıt ve Yükleme Durumları
   const [kayitYapiliyor, setKayitYapiliyor] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [yuklemeYuzdesi, setYuklemeYuzdesi] = useState(0);
 
+  // Audio Referansları
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -34,8 +36,8 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
   // --- SİLME ---
   const sil = async (id: number) => {
     if(!confirm('Silmek istediğine emin misin?')) return;
-    setListe(prev => prev.filter(m => m.id !== id));
-    await medyaSil(id);
+    setListe(prev => prev.filter(m => m.id !== id)); // Arayüzden hemen sil
+    await medyaSil(id); // Veritabanından sil
   };
 
   // --- 🚀 DIRECT UPLOAD (Vercel Limitini Aşar) ---
@@ -44,7 +46,7 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
         setYukleniyor(true);
         setYuklemeYuzdesi(10);
 
-        // 1. İmza Al
+        // 1. İmza Al (Sunucudan yetki alıyoruz)
         const { timestamp, signature } = await getCloudinarySignature();
         const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
         const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY;
@@ -62,11 +64,11 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
         formData.append('timestamp', timestamp.toString());
         formData.append('signature', signature);
         formData.append('folder', 'bebek-medya');
-        formData.append('resource_type', 'video'); // Ses için 'video' kullanılır
+        formData.append('resource_type', 'video'); // Ses dosyaları 'video' olarak yüklenir
 
         setYuklemeYuzdesi(40);
 
-        // 3. Cloudinary'ye Gönder
+        // 3. Cloudinary'ye Gönder (Sunucuya uğramadan)
         const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
             method: 'POST',
             body: formData
@@ -80,7 +82,7 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
         const data = await response.json();
         setYuklemeYuzdesi(90);
 
-        // 4. Süre Hesapla
+        // 4. Süre Hesapla (Dakika:Saniye formatı)
         let sureStr = "00:00";
         if (data.duration) {
             const totalSeconds = Math.round(data.duration);
@@ -93,7 +95,7 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
         await medyaKaydet(baslik, data.secure_url, sureStr, tip);
         
         setYuklemeYuzdesi(100);
-        window.location.reload();
+        window.location.reload(); // Listeyi güncellemek için sayfayı yenile
 
     } catch (error: any) {
         console.error(error);
@@ -149,15 +151,17 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
     <div>
        <audio ref={audioRef} onEnded={() => setCalanId(null)} className="hidden" />
 
+       {/* Üst Butonlar */}
        <div className="flex gap-2 mb-4">
-          <button onClick={() => setMod('kayit')} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors">
+          <button onClick={() => setMod('kayit')} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
              <Mic className="w-4 h-4 text-red-400" /> Kaydet
           </button>
-          <button onClick={() => setMod('yukle')} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors">
+          <button onClick={() => setMod('yukle')} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
              <Upload className="w-4 h-4 text-blue-400" /> Yükle
           </button>
        </div>
 
+       {/* Liste Görünümü */}
        <div className="space-y-2">
           {liste.map((m) => (
              <div key={m.id} className={`bg-slate-800/50 p-3 rounded-xl flex items-center gap-3 border transition-colors ${calanId === m.id ? 'border-purple-500' : 'border-transparent'}`}>
@@ -168,7 +172,7 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
                     <h4 className="text-sm font-medium text-slate-200 truncate">{m.baslik}</h4>
                     <span className="text-[10px] text-slate-400 uppercase font-bold">{m.tip} • {m.süre}</span>
                 </div>
-                <button onClick={() => sil(m.id)} className="p-2 text-slate-500 hover:text-red-400 transition-colors">
+                <button onClick={() => sil(m.id)} className="p-2 text-slate-500 hover:text-red-400">
                     <Trash2 className="w-4 h-4" />
                 </button>
              </div>
@@ -176,7 +180,7 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
           {liste.length === 0 && <div className="text-center text-slate-500 text-xs py-4 border border-dashed border-slate-700 rounded-xl">Henüz kayıt yok.</div>}
        </div>
 
-       {/* MODAL */}
+       {/* MODAL PENCERELER */}
        {modalAcik && (
          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-2xl p-6 relative shadow-2xl">
@@ -187,14 +191,18 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
                    </button>
                )}
 
+               {/* KAYIT MODU */}
                {mod === 'kayit' && (
                   <div className="text-center py-6">
                      <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-6 transition-all duration-500 ${kayitYapiliyor ? 'bg-red-500/20 ring-4 ring-red-500/10 scale-110' : 'bg-slate-700'}`}>
                         <Mic className={`w-10 h-10 ${kayitYapiliyor ? 'text-red-500 animate-pulse' : 'text-slate-400'}`} />
                      </div>
                      
-                     <h3 className="text-lg font-bold text-white mb-2">{yukleniyor ? 'Yükleniyor...' : kayitYapiliyor ? 'Kayıt Sürüyor...' : 'Ses Kaydet'}</h3>
+                     <h3 className="text-lg font-bold text-white mb-2">
+                        {yukleniyor ? 'Yükleniyor...' : kayitYapiliyor ? 'Kayıt Sürüyor...' : 'Ses Kaydet'}
+                     </h3>
                      
+                     {/* Yükleme Çubuğu */}
                      {yukleniyor && (
                          <div className="w-full bg-slate-700 rounded-full h-2 mb-4 overflow-hidden">
                             <div className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out" style={{ width: `${yuklemeYuzdesi}%` }}></div>
@@ -215,12 +223,17 @@ export default function KullaniciMedyasi({ baslangicListesi }: { baslangicListes
                   </div>
                )}
 
+               {/* YÜKLEME MODU */}
                {mod === 'yukle' && (
                   <form onSubmit={dosyaYukleSubmit} className="space-y-5">
-                     <div className="text-center"><h3 className="text-lg font-bold text-white">Dosya Yükle</h3></div>
+                     <div className="text-center">
+                        <h3 className="text-lg font-bold text-white">Dosya Yükle</h3>
+                        <p className="text-xs text-slate-400 mt-1">Telefonundaki MP3 ninnileri yükle</p>
+                     </div>
+
                      <div>
                         <label className="text-xs font-bold text-slate-400 block mb-1.5 ml-1">Başlık</label>
-                        <input name="baslik" required placeholder="Örn: Ninni" className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm outline-none focus:border-blue-500 transition-all placeholder:text-slate-600" />
+                        <input name="baslik" required placeholder="Örn: Dandini Dastana" className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm outline-none focus:border-blue-500 transition-all placeholder:text-slate-600" />
                      </div>
                      
                      {!yukleniyor && (

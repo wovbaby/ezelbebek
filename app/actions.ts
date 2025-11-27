@@ -5,15 +5,15 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- CLOUDINARY AYARLARI ---
+// --- 1. CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY, // .env.local içindeki server-side key
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
 
-// --- YARDIMCI: SUPABASE CLIENT ---
+// --- 2. YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,7 +32,7 @@ async function getSupabaseClient() {
     );
 }
 
-// --- YARDIMCI: SEÇİLİ BEBEK ID ---
+// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
@@ -62,6 +62,7 @@ export async function yeniBebekEkle(formData: FormData) {
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
+  // Küçük resimler için sunucu tarafı yükleme
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
@@ -78,7 +79,7 @@ export async function yeniBebekEkle(formData: FormData) {
 
   const { error } = await supabase.from('bebekler').insert([{ 
       ad, dogum_tarihi, cinsiyet, 
-      boy: parseFloat(boy)||0, kilo: parseFloat(kilo)||0, 
+      boy, kilo, 
       resim_url: resimUrl, 
       user_id: user.id 
   }]);
@@ -124,6 +125,10 @@ export async function profilGuncelle(formData: FormData) {
   return true;
 }
 
+// ==========================================
+//            GÜNLÜK TAKİP & SAĞLIK
+// ==========================================
+
 export async function aktiviteEkle(tip: string, detay: string) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
@@ -166,7 +171,7 @@ export async function atesEkle(formData: FormData) {
   const ilac = formData.get('ilac') as string;
   const notlar = formData.get('notlar') as string;
   const { error } = await supabase.from('ates_takibi').insert([{ 
-      bebek_id: bebekId, derece: parseFloat(derece), olcum_yeri, ilac, notlar 
+      bebek_id: bebekId, derece, olcum_yeri, ilac, notlar 
   }]);
   if (error) return false;
   revalidatePath('/saglik/ates');
@@ -253,7 +258,7 @@ export async function kaloriEkle(miktar: number) {
 //            FORUM & MARKET
 // ==========================================
 
-// --- FORUM KONUSU EKLE (Artık burada!) ---
+// --- FORUM KONUSU EKLE (ARANAN FONKSİYON BU) ---
 export async function konuEkle(baslik: string, icerik: string, kategori: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -278,7 +283,7 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   return true;
 }
 
-// --- MARKET İLANI EKLE ---
+// --- MARKET İLANI EKLE (Direct Upload Uyumlu) ---
 export async function ilanEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -293,6 +298,7 @@ export async function ilanEkle(formData: FormData) {
   const durum = formData.get('durum') as string;
   const iletisim = formData.get('iletisim') as string;
   
+  // Direct Upload ile gelen URL'yi alıyoruz
   const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
 
   if (!baslik || isNaN(fiyat) || !sehir) return { success: false, error: "Zorunlu alanlar eksik." };
@@ -313,15 +319,18 @@ export async function ilanEkle(formData: FormData) {
 //        MEDYA (DIRECT UPLOAD)
 // ==========================================
 
-// 1. İMZA ALMA
-export async function getCloudinarySignature() {
+// 1. İMZA ALMA (Klasör adı parametresi eklendi!)
+export async function getCloudinarySignature(folderName: string = 'bebek-medya') {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Giriş yapmalısın");
 
   const timestamp = Math.round(new Date().getTime() / 1000);
   const signature = cloudinary.utils.api_sign_request(
-    { timestamp, folder: 'bebek-medya' },
+    {
+      timestamp: timestamp,
+      folder: folderName, // Dinamik klasör
+    },
     process.env.CLOUDINARY_API_SECRET!
   );
 
@@ -333,16 +342,8 @@ export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-
-  const { error } = await supabase.from('medya_kutusu').insert([{
-    user_id: user.id,
-    baslik,
-    dosya_url: dosyaUrl,
-    tip, 
-    süre: sure
-  }]);
-
-  if (error) { console.error("DB Kayıt hatası:", error); return false; }
+  const { error } = await supabase.from('medya_kutusu').insert([{ user_id: user.id, baslik, dosya_url: dosyaUrl, tip, süre: sure }]);
+  if (error) return false;
   revalidatePath('/medya');
   return true;
 }
