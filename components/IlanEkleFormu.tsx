@@ -4,15 +4,15 @@ import { useState } from 'react';
 import { Upload, Check, Loader2, Image as ImageIcon, MapPin, ChevronDown } from 'lucide-react';
 import { getCloudinarySignature, ilanEkle } from '@/app/actions';
 
-// Örnek İl Listesi (Tamamını JSON dosyasından da çekebilirsin ama pratik olsun diye buraya koydum)
+// İller ve İlçeler Listesi (Kısaltılmış örnek - tamamını kullanabilirsin)
 const ILLER_VE_ILCELER: Record<string, string[]> = {
-  "İstanbul": ["Adalar", "Arnavutköy", "Ataşehir", "Avcılar", "Bağcılar", "Bahçelievler", "Bakırköy", "Başakşehir", "Bayrampaşa", "Beşiktaş", "Beykoz", "Beylikdüzü", "Beyoğlu", "Büyükçekmece", "Çatalca", "Çekmeköy", "Esenler", "Esenyurt", "Eyüpsultan", "Fatih", "Gaziosmanpaşa", "Güngören", "Kadıköy", "Kağıthane", "Kartal", "Küçükçekmece", "Maltepe", "Pendik", "Sancaktepe", "Sarıyer", "Silivri", "Sultanbeyli", "Sultangazi", "Şile", "Şişli", "Tuzla", "Ümraniye", "Üsküdar", "Zeytinburnu"],
-  "Ankara": ["Akyurt", "Altındağ", "Ayaş", "Bala", "Beypazarı", "Çamlıdere", "Çankaya", "Çubuk", "Elmadağ", "Etimesgut", "Evren", "Gölbaşı", "Güdül", "Haymana", "Kalecik", "Kahramankazan", "Keçiören", "Kızılcahamam", "Mamak", "Nallıhan", "Polatlı", "Pursaklar", "Sincan", "Şereflikoçhisar", "Yenimahalle"],
-  "İzmir": ["Aliağa", "Balçova", "Bayındır", "Bayraklı", "Bergama", "Beydağ", "Bornova", "Buca", "Çeşme", "Çiğli", "Dikili", "Foça", "Gaziemir", "Güzelbahçe", "Karabağlar", "Karaburun", "Karşıyaka", "Kemalpaşa", "Kınık", "Kiraz", "Konak", "Menderes", "Menemen", "Narlıdere", "Ödemiş", "Seferihisar", "Selçuk", "Tire", "Torbalı", "Urla"],
-  "Adana": ["Seyhan", "Çukurova", "Yüreğir", "Sarıçam", "Ceyhan", "Kozan", "İmamoğlu", "Karataş", "Karaisalı", "Pozantı", "Yumurtalık", "Tufanbeyli", "Feke", "Saimbeyli", "Aladağ"],
-  "Antalya": ["Akseki", "Aksu", "Alanya", "Demre", "Döşemealtı", "Elmalı", "Finike", "Gazipaşa", "Gündoğmuş", "İbradı", "Kaş", "Kemer", "Kepez", "Konyaaltı", "Korkuteli", "Kumluca", "Manavgat", "Muratpaşa", "Serik"],
-  "Bursa": ["Osmangazi", "Yıldırım", "Nilüfer", "İnegöl", "Gemlik", "Mustafakemalpaşa", "Karacabey", "Orhangazi", "Kestel", "Gürsu", "Mudanya", "Yenişehir", "İznik", "Orhaneli", "Keles", "Büyükorhan", "Harmancık"],
-  // ... Diğer iller eklenebilir
+  "Adana": ["Seyhan", "Çukurova", "Yüreğir", "Sarıçam", "Ceyhan", "Kozan"],
+  "Ankara": ["Çankaya", "Keçiören", "Yenimahalle", "Mamak", "Etimesgut", "Sincan", "Altındağ", "Pursaklar"],
+  "Antalya": ["Kepez", "Muratpaşa", "Alanya", "Manavgat", "Konyaaltı", "Serik", "Aksu"],
+  "Bursa": ["Osmangazi", "Yıldırım", "Nilüfer", "İnegöl", "Gemlik", "Mudanya"],
+  "İstanbul": ["Esenyurt", "Küçükçekmece", "Bağcılar", "Pendik", "Ümraniye", "Kadıköy", "Beşiktaş", "Şişli", "Fatih"],
+  "İzmir": ["Buca", "Karabağlar", "Bornova", "Konak", "Karşıyaka", "Çeşme"],
+  // ... Diğer illeri buraya ekleyebilirsin
   "Diğer": []
 };
 
@@ -30,35 +30,38 @@ export default function IlanEkleFormu() {
 
     try {
       setResimYukleniyor(true);
+      
+      // ÖNEMLİ: Klasör adını sunucuya bildiriyoruz
+      const klasorAdi = 'bebek-pwa-urunler'; 
 
-      // 1. İmza Al (Sunucudan)
-      const { timestamp, signature } = await getCloudinarySignature();
+      // 1. İmza Al
+      const { timestamp, signature } = await getCloudinarySignature(klasorAdi);
       const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
       const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY;
 
       if (!apiKey || !cloudName) {
-        alert("Sistem Hatası: API anahtarları eksik.");
+        alert("API anahtarları eksik! .env.local dosyasını kontrol et.");
         setResimYukleniyor(false);
         return;
       }
 
-      // 2. Cloudinary'ye Gönder (Vercel'i atlayarak)
+      // 2. Cloudinary'ye Gönder
       const formData = new FormData();
       formData.append('file', file);
       formData.append('api_key', apiKey);
       formData.append('timestamp', timestamp.toString());
       formData.append('signature', signature);
-      formData.append('folder', 'bebek-pwa-urunler'); // Market klasörü
+      formData.append('folder', klasorAdi); // İmzadaki klasörle aynı olmalı
 
       const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',
         body: formData
       });
 
-      if (!response.ok) throw new Error('Yükleme başarısız');
+      if (!response.ok) throw new Error('Yükleme başarısız (Yetki Hatası)');
 
       const data = await response.json();
-      setResimUrl(data.secure_url); // Resmin linkini kaydet
+      setResimUrl(data.secure_url);
 
     } catch (error: any) {
       console.error(error);
@@ -72,12 +75,12 @@ export default function IlanEkleFormu() {
   const formuGonder = async (formData: FormData) => {
     setLoading(true);
     
-    // Eğer resim yüklendiyse, linki forma ekle
+    // Yüklenen resmin URL'ini forma ekle
     if (resimUrl) {
       formData.append('resim_url', resimUrl);
     }
 
-    // İl ve İlçe dropdown'dan gelen veriyi ekle
+    // İl ve İlçe verisini ekle
     if(secilenIl) formData.set('sehir', secilenIl);
     if(secilenIlce) formData.set('ilce', secilenIlce);
 
@@ -85,7 +88,7 @@ export default function IlanEkleFormu() {
     
     if (sonuc?.success) {
       alert("İlan başarıyla yayınlandı! 🎉");
-      window.location.href = '/takas'; // Sayfayı yenile
+      window.location.href = '/takas'; 
     } else {
       alert(`Hata: ${sonuc?.error || "Bilinmeyen bir hata oluştu."}`);
     }
@@ -97,7 +100,7 @@ export default function IlanEkleFormu() {
       
       {/* Resim Alanı */}
       <div className="flex justify-center">
-        <label className={`w-full h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden ${resimUrl ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:bg-gray-50'}`}>
+        <label className={`w-full h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer relative overflow-hidden ${resimUrl ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:bg-gray-50'}`}>
           {resimUrl ? (
             <img src={resimUrl} alt="İlan Resmi" className="w-full h-full object-cover" />
           ) : (
@@ -120,25 +123,24 @@ export default function IlanEkleFormu() {
       </div>
 
       <div className="space-y-3">
-        <input name="baslik" required placeholder="Ürün Başlığı (Örn: Bebek Arabası)" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" />
+        <input name="baslik" required placeholder="Ürün Başlığı (Örn: Bebek Arabası)" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm" />
         
         <div className="flex gap-3">
           <div className="flex-1 relative">
-             <input name="fiyat" required type="number" placeholder="Fiyat" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" />
+             <input name="fiyat" required type="number" placeholder="Fiyat" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm" />
              <span className="absolute right-3 top-3 text-gray-400 text-sm">₺</span>
           </div>
-          <select name="durum" className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm text-gray-600 appearance-none">
+          <select name="durum" className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm text-gray-600">
             <option value="yeni">Yeni</option>
             <option value="az_kullanilmis">Az Kullanılmış</option>
             <option value="kullanilmis">Kullanılmış</option>
           </select>
         </div>
 
-        <select name="kategori" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm text-gray-600 appearance-none">
+        <select name="kategori" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm text-gray-600">
           <option value="giyim">Giyim</option>
           <option value="oyuncak">Oyuncak</option>
           <option value="mobilya">Mobilya</option>
-          <option value="arac_gerec">Araç Gereç</option>
           <option value="diger">Diğer</option>
         </select>
 
@@ -192,7 +194,7 @@ export default function IlanEkleFormu() {
           </div>
         </div>
 
-        <input name="iletisim" placeholder="İletişim (Tel/Email)" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" />
+        <input name="iletisim" placeholder="İletişim (Tel/Email)" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm" />
       </div>
 
       <button 
