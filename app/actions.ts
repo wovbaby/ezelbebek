@@ -5,15 +5,15 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- 1. CLOUDINARY AYARLARI ---
+// --- CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY, // .env.local içindeki server-side key
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
 
-// --- 2. YARDIMCI: SUPABASE CLIENT ---
+// --- YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,11 +32,35 @@ async function getSupabaseClient() {
     );
 }
 
-// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
+// --- YARDIMCI: SEÇİLİ BEBEK ID (GÜÇLENDİRİLDİ) ---
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
-  return seciliId ? parseInt(seciliId) : 0; 
+  
+  // 1. Çerez varsa direkt onu kullan
+  if (seciliId) return parseInt(seciliId);
+
+  // 2. Çerez yoksa veritabanından İLK bebeği bul ve onu kullan
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (user) {
+     const { data } = await supabase
+        .from('bebekler')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('id', { ascending: true }) // En eski kaydı al
+        .limit(1)
+        .single();
+     
+     // Bulduğun ID'yi hemen cookie'ye yaz ki bir dahaki sefere sormasın
+     if (data) {
+        cookieStore.set('secili_bebek', data.id.toString());
+        return data.id;
+     }
+  }
+
+  return 0; 
 }
 
 // ==========================================
@@ -49,6 +73,7 @@ export async function bebekSec(bebekId: number) {
   revalidatePath('/'); 
 }
 
+// --- GÜNCELLENEN FONKSİYON: YENİ BEBEK EKLE ---
 export async function yeniBebekEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -76,15 +101,26 @@ export async function yeniBebekEkle(formData: FormData) {
     } catch (error) { console.error("Bebek resim hatası:", error); }
   }
 
-  const { error } = await supabase.from('bebekler').insert([{ 
+  // Ekle ve Eklenen Veriyi Geri Döndür (.select().single())
+  const { data: yeniBebek, error } = await supabase
+    .from('bebekler')
+    .insert([{ 
       ad, dogum_tarihi, cinsiyet, 
       boy, kilo, 
       resim_url: resimUrl, 
       user_id: user.id 
-  }]);
+    }])
+    .select()
+    .single();
 
-  if (error) return false;
-  revalidatePath('/profil'); revalidatePath('/');
+  if (error || !yeniBebek) return false;
+
+  // --- KRİTİK HAMLE: Yeni eklenen bebeği hemen "Seçili" yap ---
+  const cookieStore = await cookies();
+  cookieStore.set('secili_bebek', yeniBebek.id.toString());
+
+  revalidatePath('/profil'); 
+  revalidatePath('/');
   return true;
 }
 
@@ -131,10 +167,21 @@ export async function profilGuncelle(formData: FormData) {
 export async function aktiviteEkle(tip: string, detay: string) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
-  if (!bebekId) return false;
+  
+  // Eğer bebek ID hala yoksa işlem yapma
+  if (!bebekId || bebekId === 0) {
+      console.error("HATA: Seçili bebek bulunamadı!");
+      return false;
+  }
+  
   const { error } = await supabase.from('aktiviteler').insert([{ bebek_id: bebekId, tip, detay }]);
-  if (error) return false;
-  revalidatePath('/');
+  
+  if (error) {
+      console.error("Aktivite ekleme hatası:", error);
+      return false;
+  }
+  
+  revalidatePath('/'); // Ana sayfayı yenile
   return true;
 }
 
@@ -269,7 +316,6 @@ export async function konuEkle(baslik: string, icerik: string, kategori: string)
   return true;
 }
 
-// --- İLAN EKLE (Direct Upload Uyumlu) ---
 export async function ilanEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -304,7 +350,6 @@ export async function ilanEkle(formData: FormData) {
 //        MEDYA (DIRECT UPLOAD)
 // ==========================================
 
-// 1. İMZA ALMA (Klasör adı parametresiyle)
 export async function getCloudinarySignature(folderName: string = 'bebek-medya') {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -312,17 +357,13 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
 
   const timestamp = Math.round(new Date().getTime() / 1000);
   const signature = cloudinary.utils.api_sign_request(
-    {
-      timestamp: timestamp,
-      folder: folderName, 
-    },
+    { timestamp, folder: folderName },
     process.env.CLOUDINARY_API_SECRET!
   );
 
   return { timestamp, signature };
 }
 
-// 2. MEDYA KAYIT
 export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string, tip: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -333,7 +374,6 @@ export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string
   return true;
 }
 
-// 3. MEDYA SİLME
 export async function medyaSil(id: number) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -344,7 +384,7 @@ export async function medyaSil(id: number) {
 }
 
 // ==========================================
-//              YORUM İŞLEMLERİ (DÜZELTİLDİ)
+//              YORUM İŞLEMLERİ
 // ==========================================
 
 export async function yorumEkle(konuId: number, icerik: string) {
@@ -365,7 +405,6 @@ export async function yorumEkle(konuId: number, icerik: string) {
     yazar_ad: yazarAdi
   }]);
 
-  // HATA VARSA GERÇEK SEBEBİ DÖNDÜRÜYORUZ
   if (error) {
     console.error("Supabase Yorum Hatası DETAY:", error.message); 
     return { success: false, error: error.message }; 
@@ -385,21 +424,11 @@ export async function kullaniciOnayla(hedefUserId: string) {
   
   if (!user) return false;
 
-  const { data: yapanKisi } = await supabase
-    .from('profiles')
-    .select('rol')
-    .eq('id', user.id)
-    .single();
+  const { data: yapanKisi } = await supabase.from('profiles').select('rol').eq('id', user.id).single();
 
-  if (yapanKisi?.rol !== 'admin') {
-    return false; 
-  }
+  if (yapanKisi?.rol !== 'admin') return false; 
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({ onayli_mi: true })
-    .eq('id', hedefUserId);
-
+  const { error } = await supabase.from('profiles').update({ onayli_mi: true }).eq('id', hedefUserId);
   if (error) return false;
 
   revalidatePath('/yonetim');

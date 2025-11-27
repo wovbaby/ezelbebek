@@ -10,7 +10,7 @@ export const revalidate = 0;
 export default async function Home() {
   const cookieStore = await cookies();
 
-  // 1. Supabase Client
+  // 1. Supabase Client Oluştur
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -24,26 +24,21 @@ export default async function Home() {
 
   // 2. Kullanıcı Kontrolü
   const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    redirect('/login');
-  }
+  if (!user) redirect('/login');
 
-  // --- GÜVENLİK KONTROLÜ (DÜZELTİLDİ: KESİN ENGEL) ---
+  // 3. Güvenlik (Onay) Kontrolü - BEKÇİ
   const { data: profil } = await supabase
     .from('profiles')
     .select('onayli_mi')
     .eq('id', user.id)
     .single();
 
-  // Profil hiç yoksa (Trigger çalışmadıysa) VEYA onaylı değilse -> Bekleme odasına
-  // 'profil?.onayli_mi !== true' demek: false ise de at, null ise de at, yoksa da at.
+  // Profil yoksa veya onaylı değilse -> Bekleme odasına
   if (!profil || profil.onayli_mi !== true) {
       redirect('/beklemede');
   }
-  // --------------------------------------------------
 
-  // 3. Bebekleri Getir (Sadece bu kullanıcının)
+  // 4. Bebekleri Getir (Sadece bu kullanıcının)
   const { data: tumBebekler } = await supabase
     .from('bebekler')
     .select('id, ad, resim_url')
@@ -51,21 +46,29 @@ export default async function Home() {
 
   const bebekler = tumBebekler || [];
 
-  // 4. Seçili Bebeği Belirle
-  const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
-  const aktifId = (seciliId && bebekler.find(b => b.id === seciliId)) ? seciliId : bebekler[0]?.id;
-  const seciliBebek = bebekler.find(b => b.id === aktifId);
+  // 5. Aktif Bebeği Belirle (MANTIK GÜÇLENDİRİLDİ)
+  let seciliId = Number(cookieStore.get('secili_bebek')?.value);
+  
+  // Eğer çerezdeki ID geçerli değilse veya listede yoksa, ilk bebeği seç
+  if (!seciliId || !bebekler.find(b => b.id === seciliId)) {
+      seciliId = bebekler.length > 0 ? bebekler[0].id : 0;
+  }
+  
+  const seciliBebek = bebekler.find(b => b.id === seciliId);
 
-  // 5. Aktiviteleri Getir
+  // 6. Aktiviteleri Getir (Hata Korumalı)
   let aktiviteler = [];
-  if (aktifId) {
-    const { data } = await supabase
+  if (seciliId > 0) {
+    const { data, error } = await supabase
       .from('aktiviteler')
       .select('*')
-      .eq('bebek_id', aktifId)
+      .eq('bebek_id', seciliId)
       .order('created_at', { ascending: false })
       .limit(20);
-    aktiviteler = data || [];
+      
+    if (!error && data) {
+        aktiviteler = data;
+    }
   }
 
   return (
@@ -95,7 +98,7 @@ export default async function Home() {
             
             {/* BEBEK SEÇİCİ */}
             <div className="self-start"> 
-                 <BebekSecici bebekler={bebekler} seciliId={aktifId} />
+                 <BebekSecici bebekler={bebekler} seciliId={seciliId} />
             </div>
 
             {/* İSİM */}
