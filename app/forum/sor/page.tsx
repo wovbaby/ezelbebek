@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { konuEkle } from '@/app/actions'; // actions.ts içindeki fonksiyon
+import { konuEkle } from '@/app/actions';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -16,7 +16,6 @@ export default function SoruSorPage() {
   const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Basit doğrulama
     if (!baslik.trim() || !icerik.trim()) {
         alert("Lütfen başlık ve içerik giriniz.");
         return;
@@ -25,18 +24,16 @@ export default function SoruSorPage() {
     setYukleniyor(true);
     
     try {
-        // Server Action'ı çağırıyoruz
         const sonuc = await konuEkle(baslik, icerik, kategori);
         
         if (sonuc) {
-            // Başarılıysa foruma dön ve yenile
             router.push('/forum');
             router.refresh();
         } else {
-            alert('Bir hata oluştu, lütfen tekrar deneyin.');
+            alert('Bir hata oluştu, tekrar deneyin.');
         }
     } catch (error) {
-        console.error("Soru sorma hatası:", error);
+        console.error(error);
         alert('Bağlantı hatası oluştu.');
     } finally {
         setYukleniyor(false);
@@ -46,8 +43,6 @@ export default function SoruSorPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 pb-24">
         <div className="max-w-md mx-auto bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-            
-            {/* Üst Başlık ve Geri Butonu */}
             <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
                 <Link href="/forum" className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
                     <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -55,13 +50,13 @@ export default function SoruSorPage() {
                 <h1 className="text-xl font-bold text-gray-800">Soru Sor</h1>
             </div>
 
-            {/* Form */}
             <form onSubmit={gonder} className="space-y-5">
-                
-                {/* Başlık Girişi */}
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Başlık</label>
+                    <label htmlFor="baslik" className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Başlık</label>
                     <input 
+                        type="text"
+                        name="baslik" // EKLENDİ
+                        id="baslik"   // EKLENDİ
                         value={baslik}
                         onChange={(e) => setBaslik(e.target.value)}
                         placeholder="Örn: Diş çıkarma dönemi ne zaman başlar?" 
@@ -71,11 +66,12 @@ export default function SoruSorPage() {
                     />
                 </div>
 
-                {/* Kategori Seçimi */}
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Kategori</label>
+                    <label htmlFor="kategori" className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Kategori</label>
                     <div className="relative">
                         <select 
+                            name="kategori" // EKLENDİ
+                            id="kategori"   // EKLENDİ
                             value={kategori}
                             onChange={(e) => setKategori(e.target.value)}
                             className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none transition-all text-gray-700 cursor-pointer"
@@ -92,10 +88,11 @@ export default function SoruSorPage() {
                     </div>
                 </div>
 
-                {/* Detay/İçerik Girişi */}
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Detaylar</label>
+                    <label htmlFor="icerik" className="block text-xs font-bold text-gray-500 uppercase mb-1.5 ml-1">Detaylar</label>
                     <textarea 
+                        name="icerik" // EKLENDİ
+                        id="icerik"   // EKLENDİ
                         value={icerik}
                         onChange={(e) => setIcerik(e.target.value)}
                         placeholder="Sorunuzu buraya detaylıca yazabilirsiniz..." 
@@ -104,7 +101,6 @@ export default function SoruSorPage() {
                     />
                 </div>
 
-                {/* Gönder Butonu */}
                 <button 
                     type="submit" 
                     disabled={yukleniyor}
