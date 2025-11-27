@@ -5,15 +5,15 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from 'cloudinary'; 
 import { cookies } from 'next/headers';
 
-// --- 1. CLOUDINARY AYARLARI ---
+// --- CLOUDINARY AYARLARI ---
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY, // .env.local içindeki server-side key
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
 
-// --- 2. YARDIMCI: SUPABASE CLIENT ---
+// --- YARDIMCI: SUPABASE CLIENT ---
 async function getSupabaseClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -32,11 +32,32 @@ async function getSupabaseClient() {
     );
 }
 
-// --- 3. YARDIMCI: SEÇİLİ BEBEK ID ---
+// --- YARDIMCI: SEÇİLİ BEBEK ID (AKILLI VERSİYON) ---
+// Sorunu çözen kısım burası: Cookie yoksa DB'den ilk bebeği bulur.
 async function getSeciliBebekId() {
   const cookieStore = await cookies();
   const seciliId = cookieStore.get('secili_bebek')?.value;
-  return seciliId ? parseInt(seciliId) : 0; 
+  
+  // 1. Eğer çerezde ID varsa onu kullan
+  if (seciliId) return parseInt(seciliId);
+
+  // 2. Çerez yoksa, veritabanına git ve kullanıcının ilk bebeğini bul
+  const supabase = await getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (user) {
+     const { data } = await supabase
+        .from('bebekler')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('id', { ascending: true }) // İlk eklenen bebek
+        .limit(1)
+        .single();
+     
+     if (data) return data.id;
+  }
+
+  return 0; // Hiç bebek yoksa
 }
 
 // ==========================================
@@ -62,7 +83,6 @@ export async function yeniBebekEkle(formData: FormData) {
   const resimDosyasi = formData.get('resim') as File;
   
   let resimUrl = null;
-  // Küçük resimler için sunucu tarafı yükleme
   if (resimDosyasi && resimDosyasi.size > 0) {
     try {
       const arrayBuffer = await resimDosyasi.arrayBuffer();
@@ -85,7 +105,10 @@ export async function yeniBebekEkle(formData: FormData) {
   }]);
 
   if (error) return false;
-  revalidatePath('/profil'); revalidatePath('/');
+  
+  // Bebek eklendikten sonra ana sayfayı ve profil sayfasını yenile
+  revalidatePath('/profil'); 
+  revalidatePath('/');
   return true;
 }
 
@@ -132,10 +155,18 @@ export async function profilGuncelle(formData: FormData) {
 export async function aktiviteEkle(tip: string, detay: string) {
   const supabase = await getSupabaseClient();
   const bebekId = await getSeciliBebekId();
-  if (!bebekId) return false;
+  
+  // Eğer bebek ID bulunamazsa işlem yapma
+  if (!bebekId || bebekId === 0) return false;
+  
   const { error } = await supabase.from('aktiviteler').insert([{ bebek_id: bebekId, tip, detay }]);
-  if (error) return false;
-  revalidatePath('/');
+  
+  if (error) {
+      console.error("Aktivite ekleme hatası:", error);
+      return false;
+  }
+  
+  revalidatePath('/'); // Ana sayfayı yenile
   return true;
 }
 
@@ -258,32 +289,18 @@ export async function kaloriEkle(miktar: number) {
 //            FORUM & MARKET
 // ==========================================
 
-// --- FORUM KONUSU EKLE (ARANAN FONKSİYON BU) ---
 export async function konuEkle(baslik: string, icerik: string, kategori: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if(!user) return false;
   
   const yazarAdi = user?.email?.split('@')[0] || 'Anonim Anne';
-  
-  const { error } = await supabase.from('forum_konulari').insert([{ 
-      baslik, 
-      icerik, 
-      kategori, 
-      yazar_ad: yazarAdi, 
-      user_id: user.id 
-  }]);
-  
-  if (error) {
-      console.error("Konu ekleme hatası:", error);
-      return false;
-  }
-  
+  const { error } = await supabase.from('forum_konulari').insert([{ baslik, icerik, kategori, yazar_ad: yazarAdi, user_id: user.id }]);
+  if (error) return false;
   revalidatePath('/forum');
   return true;
 }
 
-// --- MARKET İLANI EKLE (Direct Upload Uyumlu) ---
 export async function ilanEkle(formData: FormData) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -298,7 +315,6 @@ export async function ilanEkle(formData: FormData) {
   const durum = formData.get('durum') as string;
   const iletisim = formData.get('iletisim') as string;
   
-  // Direct Upload ile gelen URL'yi alıyoruz
   const resimUrl = (formData.get('resim_url') as string) || 'https://placehold.co/600x400?text=Resim+Yok';
 
   if (!baslik || isNaN(fiyat) || !sehir) return { success: false, error: "Zorunlu alanlar eksik." };
@@ -319,7 +335,6 @@ export async function ilanEkle(formData: FormData) {
 //        MEDYA (DIRECT UPLOAD)
 // ==========================================
 
-// 1. İMZA ALMA (Klasör adı parametresi eklendi!)
 export async function getCloudinarySignature(folderName: string = 'bebek-medya') {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -329,7 +344,7 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
   const signature = cloudinary.utils.api_sign_request(
     {
       timestamp: timestamp,
-      folder: folderName, // Dinamik klasör
+      folder: folderName, 
     },
     process.env.CLOUDINARY_API_SECRET!
   );
@@ -337,7 +352,6 @@ export async function getCloudinarySignature(folderName: string = 'bebek-medya')
   return { timestamp, signature };
 }
 
-// 2. MEDYA KAYIT
 export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string, tip: string) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -348,7 +362,6 @@ export async function medyaKaydet(baslik: string, dosyaUrl: string, sure: string
   return true;
 }
 
-// 3. MEDYA SİLME
 export async function medyaSil(id: number) {
   const supabase = await getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
