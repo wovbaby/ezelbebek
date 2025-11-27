@@ -1,74 +1,131 @@
-"use client";
+'use client'
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronDown, Plus, User, Baby } from 'lucide-react';
 import { bebekSec } from '@/app/actions';
-import { ChevronDown, Check, Plus, Heart } from 'lucide-react'; // Heart ikonunu ekledik
 import Link from 'next/link';
 
 export default function BebekSecici({ bebekler, seciliId }: { bebekler: any[], seciliId: number }) {
   const [acik, setAcik] = useState(false);
-  
-  // Eğer bebek listesi boşsa veya hata varsa güvenli bir varsayılan oluştur
-  const seciliBebek = bebekler.find(b => b.id === seciliId) || bebekler[0] || { ad: "Bebek" };
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const seciliBebek = bebekler?.find(b => b.id === seciliId);
+
+  // Menü dışına tıklayınca kapatma kontrolü
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setAcik(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const degistir = async (id: number) => {
-    await bebekSec(id); // Cookie'yi güncelle
+    if (id === seciliId) {
+      setAcik(false);
+      return;
+    }
+    setYukleniyor(true);
+    await bebekSec(id);
+    // Sayfa yenilemesi action içinde revalidatePath ile yapılıyor
+    setYukleniyor(false);
     setAcik(false);
-    // Sayfa server action ile yenilenecek
   };
 
   return (
-    <div className="relative z-50">
-      {/* Seçili Olan (Buton) */}
+    <div className="relative" ref={menuRef}>
+      {/* Tetikleyici Buton */}
       <button 
         onClick={() => setAcik(!acik)} 
-        className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/30 text-white font-bold text-sm shadow-sm active:scale-95 transition-transform"
+        className="flex items-center gap-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm p-2 pr-4 rounded-full transition-all border border-white/10"
       >
-        {seciliBebek.ad}
-        <ChevronDown className={`w-4 h-4 transition-transform ${acik ? 'rotate-180' : ''}`} />
+        <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center overflow-hidden border-2 border-white/50 shadow-sm">
+           {yukleniyor ? (
+             <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+           ) : seciliBebek?.resim_url ? (
+             <img src={seciliBebek.resim_url} alt={seciliBebek.ad} className="w-full h-full object-cover" />
+           ) : (
+             <Baby className="w-6 h-6 text-blue-400" />
+           )}
+        </div>
+        
+        <div className="text-left">
+          <p className="text-[10px] text-blue-100 font-medium uppercase tracking-wider leading-none mb-0.5">Seçili Bebek</p>
+          <p className="text-sm font-bold text-white leading-none flex items-center gap-1">
+            {seciliBebek?.ad || "Bebek Seç"} <ChevronDown className={`w-3 h-3 transition-transform ${acik ? 'rotate-180' : ''}`} />
+          </p>
+        </div>
       </button>
 
       {/* Açılır Menü */}
       {acik && (
-        <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden z-50 origin-top-left animate-in fade-in zoom-in-95 duration-200">
           
-          {/* Bebek Listesi */}
-          {bebekler.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => degistir(b.id)}
-              className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 flex items-center justify-between border-b border-gray-50 last:border-0"
-            >
-              <div className="flex items-center gap-2">
-                {/* Resim varsa göster, yoksa placeholder */}
-                <img 
-                  src={b.resim_url || "https://via.placeholder.com/40"} 
-                  className="w-6 h-6 rounded-full object-cover border border-gray-200" 
-                  alt={b.ad}
-                />
-                {b.ad}
-              </div>
-              {b.id === seciliId && <Check className="w-4 h-4 text-blue-600" />}
-            </button>
-          ))}
-          
-          {/* Yeni Bebek Ekle Linki */}
-          <Link 
-            href="/profil/ekle" 
-            className="w-full text-left px-4 py-3 text-xs font-bold text-blue-600 bg-gray-50 hover:bg-gray-100 flex items-center gap-2 border-t border-gray-100"
-          >
-            <Plus className="w-4 h-4" />
-            Yeni Bebek Ekle
-          </Link>
+          {/* --- Kaydırılabilir Alan (Bebek Listesi) --- */}
+          {/* max-h-[240px] sayesinde 4-5 bebekten sonra scroll çıkar */}
+          <div className="max-h-[240px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+            <div className="p-2 space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 px-3 py-1 uppercase">Bebeklerim</p>
+              
+              {bebekler?.map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => degistir(b.id)}
+                  className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors text-left ${b.id === seciliId ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50'}`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                    {b.resim_url ? (
+                      <img src={b.resim_url} alt={b.ad} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs">👶</span>
+                    )}
+                  </div>
+                  <span className={`text-sm font-bold ${b.id === seciliId ? 'text-blue-600' : 'text-gray-700'}`}>
+                    {b.ad}
+                  </span>
+                  {b.id === seciliId && <div className="ml-auto w-2 h-2 rounded-full bg-blue-500" />}
+                </button>
+              ))}
 
-          {/* YENİ: Anne Profili Linki (Pembe) */}
-          <Link 
-            href="/anne" 
-            className="w-full text-left px-4 py-3 text-xs font-bold text-pink-600 bg-pink-50 hover:bg-pink-100 flex items-center gap-2 border-t border-pink-100"
-          >
-            <Heart className="w-4 h-4" />
-            Anne Profili
-          </Link>
+              {/* Listede Bebek Yoksa */}
+              {(!bebekler || bebekler.length === 0) && (
+                 <p className="text-xs text-gray-400 px-3 py-2">Kayıtlı bebek yok.</p>
+              )}
+              
+              {/* Yeni Bebek Ekle (Listenin En Sonunda) */}
+              <Link 
+                href="/profil/ekle" 
+                onClick={() => setAcik(false)}
+                className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 text-blue-600 transition-colors"
+              >
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-bold">Yeni Bebek Ekle</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* --- Sabit Alt Alan (Anne Profili) --- */}
+          {/* Burası scroll'dan etkilenmez, hep en altta görünür */}
+          <div className="border-t border-gray-100 bg-gray-50/80 p-2 backdrop-blur-sm">
+             <Link 
+                href="/anne" 
+                onClick={() => setAcik(false)}
+                className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-pink-100 group"
+              >
+                  <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center border border-pink-200 group-hover:scale-110 transition-transform">
+                    <User className="w-4 h-4 text-pink-500" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-gray-700 block group-hover:text-pink-600">Anne Profili</span>
+                    <span className="text-[10px] text-gray-400 block">Kendinle ilgilen</span>
+                  </div>
+              </Link>
+          </div>
 
         </div>
       )}
