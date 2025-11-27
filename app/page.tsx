@@ -1,56 +1,62 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation'; // Yönlendirme için
 import { Baby, Utensils, Moon, Wind } from 'lucide-react';
 import HizliIslem from '@/components/HizliIslem';
 import BebekSecici from '@/components/BebekSecici';
 
-// Sayfanın her istekte yenilenmesini sağla (Dinamik Veri)
 export const revalidate = 0;
 
 export default async function Home() {
   const cookieStore = await cookies();
 
-  // 1. Sunucu Tarafı Supabase İstemcisi Oluştur
+  // 1. Supabase Client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-           // Server Component içinde cookie set edilemez ama okuma için gereklidir
-           try {
-             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-           } catch {
-             // Server component set hatasını yoksay
-           }
-        },
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) { try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {} },
       },
     }
   );
 
-  // 2. Giriş Yapan Kullanıcıyı Bul
+  // 2. Kullanıcı Kontrolü
   const { data: { user } } = await supabase.auth.getUser();
-
-  // 3. SADECE Bu Kullanıcıya Ait Bebekleri Getir (.eq('user_id', user.id))
-  // Eğer kullanıcı yoksa boş dizi döner
-  let tumBebekler = [];
-  if (user) {
-    const { data } = await supabase
-      .from('bebekler')
-      .select('id, ad, resim_url')
-      .eq('user_id', user.id); // <-- İŞTE SİHİRLİ SATIR
-    tumBebekler = data || [];
+  
+  if (!user) {
+    redirect('/login'); // Giriş yapmamışsa login'e at
   }
+
+  // --- GÜVENLİK KONTROLÜ (YENİ EKLENDİ) ---
+  // Kullanıcının onay durumuna bakıyoruz
+  const { data: profil } = await supabase
+    .from('profiles')
+    .select('onayli_mi')
+    .eq('id', user.id)
+    .single();
+
+  // Eğer profil var ve onaylanmamışsa -> Bekleme odasına postala
+  if (profil && profil.onayli_mi === false) {
+      redirect('/beklemede');
+  }
+  // -----------------------------------------
+
+  // 3. Bebekleri Getir (Sadece bu kullanıcının)
+  const { data: tumBebekler } = await supabase
+    .from('bebekler')
+    .select('id, ad, resim_url')
+    .eq('user_id', user.id);
+
+  const bebekler = tumBebekler || [];
 
   // 4. Seçili Bebeği Belirle
   const seciliId = Number(cookieStore.get('secili_bebek')?.value) || 0;
-  const aktifId = (seciliId && tumBebekler.find(b => b.id === seciliId)) ? seciliId : tumBebekler[0]?.id;
-  const seciliBebek = tumBebekler.find(b => b.id === aktifId);
+  const aktifId = (seciliId && bebekler.find(b => b.id === seciliId)) ? seciliId : bebekler[0]?.id;
+  const seciliBebek = bebekler.find(b => b.id === aktifId);
 
-  // 5. Aktiviteleri Getir (Eğer bebek seçiliyse)
+  // 5. Aktiviteleri Getir
   let aktiviteler = [];
   if (aktifId) {
     const { data } = await supabase
@@ -65,7 +71,7 @@ export default async function Home() {
   return (
     <main className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       
-      {/* --- 1. HEADER (SABİT, RESİMLİ) --- */}
+      {/* --- HEADER --- */}
       <header className="flex-none h-64 relative z-40 rounded-b-[2.5rem] overflow-hidden shadow-xl bg-blue-600">
         
         {/* Arkaplan Resmi */}
@@ -87,12 +93,12 @@ export default async function Home() {
         {/* İÇERİK */}
         <div className="absolute inset-0 flex flex-col justify-between p-6 pt-12">
             
-            {/* BEBEK SEÇİCİ - SOL ÜSTTE */}
+            {/* BEBEK SEÇİCİ */}
             <div className="self-start"> 
-                 <BebekSecici bebekler={tumBebekler} seciliId={aktifId} />
+                 <BebekSecici bebekler={bebekler} seciliId={aktifId} />
             </div>
 
-            {/* İSİM - ORTADA ALTTA */}
+            {/* İSİM */}
             <div className="text-center text-white mb-2">
                 <h2 className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">Hoş Geldin</h2>
                 <h1 className="text-4xl font-bold tracking-tight drop-shadow-md">{seciliBebek?.ad || "Bebek Ekle"}</h1>
@@ -100,10 +106,10 @@ export default async function Home() {
         </div>
       </header>
 
-      {/* --- 2. İÇERİK ALANI (KAYDIRILABİLİR) --- */}
+      {/* --- İÇERİK ALANI --- */}
       <div className="flex-1 overflow-y-auto relative z-30 scrollbar-hide">
         
-        {/* HIZLI İŞLEM (YAPIŞKAN / STICKY) */}
+        {/* HIZLI İŞLEM MENÜSÜ */}
         {seciliBebek && (
           <div className="sticky top-0 z-50 px-5 pt-6 pb-2 bg-gray-50/95 backdrop-blur-sm transition-all">
               <div className="origin-top"> 
@@ -112,7 +118,7 @@ export default async function Home() {
           </div>
         )}
 
-        {/* CANLI LOG LİSTESİ */}
+        {/* LOG LİSTESİ */}
         <div className="px-6 pb-32 mt-2">
             <h3 className="text-gray-800 font-bold text-md mb-3 flex items-center gap-2 ml-1">
                 Bugünün Hareketleri
