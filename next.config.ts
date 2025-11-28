@@ -14,9 +14,13 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**" },
     ],
   },
-  // Server Actions'a izin ver
+  // Server Actions Ayarları
   experimental: {
     serverActions: {
+      // 🟢 KRİTİK AYAR: Varsayılan 1MB yükleme limitini 10MB'a çıkarıyoruz.
+      // Bu satır olmadan büyük resimlerde "400 Bad Request" hatası alırsın.
+      bodySizeLimit: '10mb',
+      
       allowedOrigins: [
         "localhost:3000", 
         "*.app.github.dev", 
