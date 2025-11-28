@@ -1,65 +1,21 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Camera, Dumbbell, Flame } from 'lucide-react';
+import { Droplets, Calendar, RefreshCcw, Heart, Sparkles, Dumbbell, Flame } from 'lucide-react'; // Camera'yı sildik, formda var artık
 import { suIc, suSifirla, anneGuncelle } from '@/app/actions';
 import Link from 'next/link';
+import AnneProfilFormu from '@/components/AnneProfilFormu'; // <--- YENİ BİLEŞENİ İMPORT ET
 
 export const revalidate = 0;
 
-// --- GÜNLÜK MOTİVASYON ÜRETİCİSİ (AI SİMÜLASYONU) ---
+// ... (motivasyonUret fonksiyonu AYNI KALSIN, buraya ellemiyoruz) ...
 function motivasyonUret(anneAdi: string) {
-  // 1. Giriş (Hitap)
-  const girisler = [
-    `Günaydın ${anneAdi},`, 
-    `Harika bir gün seni bekliyor ${anneAdi},`, 
-    `Sevgili ${anneAdi}, bugün ışıl ışıl parlıyorsun,`,
-    `Biliyorum bazen yoruluyorsun ${anneAdi}, ama`,
-    `Hey süper kahraman ${anneAdi},`,
-    `Bugün gökyüzü senin için gülümsüyor ${anneAdi},`
-  ];
-
-  // 2. Durum Tespiti (Empati)
-  const durumlar = [
-    "annelik zorlu bir maraton ve sen harika gidiyorsun.",
-    "bebeğinin o gülüşü tüm uykusuz gecelere değiyor.",
-    "bugün kendine biraz şefkat gösterme zamanı.",
-    "sabır depon bazen azalabilir, bu çok normal.",
-    "yaptığın fedakarlıklar görünmez değil, hepsi birer mucize.",
-    "içindeki gücün farkında mısın? Dağları devirebilirsin."
-  ];
-
-  // 3. Aksiyon / Tavsiye
-  const tavsiyeler = [
-    "Şimdi derin bir nefes al ve omuzlarını gevşet.",
-    "O kahveyi soğutmadan içmeyi hak ettin.",
-    "Bugün ev işlerini boş ver, anın tadını çıkar.",
-    "Aynaya bak ve 'Ben harikayım' de, çünkü öylesin!",
-    "Bebeğin uyuduğunda sen de sadece uzan ve hiçbir şey yapma.",
-    "Sevdiğin bir şarkıyı aç ve modunu yükselt."
-  ];
-
-  // 4. Kapanış (Güçlendirme)
-  const sonlar = [
-    "Sen bu işi çok iyi biliyorsun.",
-    "Unutma, mükemmel değil mutlu anne lazım.",
-    "Senin mutluluğun evin güneşidir.",
-    "Yalnız değilsin, hepimiz aynı yoldayız.",
-    "Sana güveniyoruz!",
-    "Bugün senin günün olsun."
-  ];
-
-  // Rastgele Birleştir
-  const r1 = girisler[Math.floor(Math.random() * girisler.length)];
-  const r2 = durumlar[Math.floor(Math.random() * durumlar.length)];
-  const r3 = tavsiyeler[Math.floor(Math.random() * tavsiyeler.length)];
-  const r4 = sonlar[Math.floor(Math.random() * sonlar.length)];
-
-  return `${r1} ${r2} ${r3} ${r4}`;
+    // ... senin kodundaki içerik aynı kalsın ...
+    const girisler = ["Günaydın", "Merhaba"]; // Kısaltma amaçlı yazdım, seninkiler kalsın
+    return `Harika bir gün ${anneAdi}`; // Örnek
 }
 
 export default async function AnnePage() {
-  // 1. Çerezleri ve Supabase Client'ı oluştur
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -77,21 +33,18 @@ export default async function AnnePage() {
     }
   );
 
-  // 2. Kullanıcıyı Kontrol Et
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
     redirect('/login');
   }
 
-  // 3. SADECE Bu Kullanıcının Anne Profilini Getir
   let { data: anne } = await supabase
     .from('anne_profili')
     .select('*')
-    .eq('user_id', user.id) // <-- KRİTİK DEĞİŞİKLİK
+    .eq('user_id', user.id)
     .single();
 
-  // 4. Dinamik Mesajı Oluştur
   const gununSozu = motivasyonUret(anne?.ad || "Anne");
 
   // --- DÖNGÜ HESAPLAMA ---
@@ -138,7 +91,7 @@ export default async function AnnePage() {
                     <p className="text-xs text-gray-400 mt-1 ml-1">Kendine iyi bak ki, dünya güzelleşsin.</p>
                 </div>
                 
-                {/* Profil Resmi */}
+                {/* Profil Resmi - Header'daki küçük ikon */}
                 <div className="w-14 h-14 bg-pink-100 rounded-full flex items-center justify-center border-2 border-white shadow-md overflow-hidden relative">
                     {anne?.resim_url ? (
                         <img src={anne.resim_url} alt="Anne" className="w-full h-full object-cover" />
@@ -151,7 +104,7 @@ export default async function AnnePage() {
 
         <div className="p-6 space-y-6">
             
-            {/* 1. GÜNÜN MESAJI (DİNAMİK) */}
+            {/* 1. GÜNÜN MESAJI */}
             <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-5 rounded-2xl text-white shadow-lg shadow-pink-200 relative overflow-hidden">
                 <Sparkles className="w-16 h-16 absolute -top-4 -right-4 text-white/20 rotate-12" />
                 <h3 className="font-bold text-xs flex items-center gap-2 mb-2 uppercase tracking-wider opacity-90">
@@ -160,7 +113,7 @@ export default async function AnnePage() {
                 <p className="text-sm font-medium italic leading-relaxed">"{gununSozu}"</p>
             </div>
 
-            {/* 2. REGL DÖNGÜSÜ */}
+            {/* 2. REGL DÖNGÜSÜ ve PROFİL DÜZENLEME (BURASI DEĞİŞTİ) */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-pink-100">
                 <div className="flex justify-between items-start mb-4">
                     <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -171,42 +124,17 @@ export default async function AnnePage() {
                     </span>
                 </div>
 
-                <div className="flex gap-6">
-                    <div className="flex flex-col items-center justify-center bg-pink-50 w-24 h-24 rounded-full border-4 border-pink-200 shrink-0">
-                        <p className="text-3xl font-bold text-gray-800">{kalanGun}</p>
-                        <p className="text-[9px] text-gray-500 uppercase font-bold">Gün Kaldı</p>
-                    </div>
-                    
-                    <form action={anneGuncelle} className="flex-1 space-y-3">
-                        <div className="flex gap-2">
-                            <div className="flex-1">
-                                <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1">İsim</label>
-                                <input type="text" name="ad" defaultValue={anne?.ad || 'Anne'} className="w-full p-2 bg-gray-50 rounded-lg border border-gray-200 text-xs" placeholder="İsminiz" />
-                            </div>
-                            <div>
-                                <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1 text-center">Foto</label>
-                                <label className="w-[34px] h-[34px] flex items-center justify-center bg-pink-100 text-pink-500 rounded-lg cursor-pointer hover:bg-pink-200 transition-colors">
-                                    <Camera className="w-4 h-4" />
-                                    <input type="file" name="resim" accept="image/*" className="hidden" />
-                                </label>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1">Son Adet Tarihi</label>
-                            <input type="date" name="son_adet_tarihi" defaultValue={anne?.son_adet_tarihi} className="w-full p-2 bg-gray-50 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-pink-400 outline-none" />
-                        </div>
-                        
-                        <div className="flex gap-2 items-end">
-                            <div className="flex-1">
-                                <label className="text-[9px] text-gray-400 uppercase font-bold block mb-1">Döngü (Gün)</label>
-                                <input type="number" name="dongu_suresi" defaultValue={anne?.dongu_suresi || 28} className="w-full p-2 bg-gray-50 rounded-lg border border-gray-200 text-xs text-center" />
-                            </div>
-                            <button type="submit" className="h-[34px] px-4 bg-pink-500 text-white text-xs rounded-lg font-bold shadow-md active:scale-95 transition-transform">
-                                Kaydet
-                            </button>
-                        </div>
-                    </form>
+                {/* YENİ BİLEŞENİ BURADA KULLANIYORUZ */}
+                <div className="flex flex-col gap-4">
+                     <div className="flex items-center gap-2 mb-2">
+                         <div className="flex flex-col items-center justify-center bg-pink-50 w-full p-2 rounded-xl border border-pink-100">
+                             <p className="text-3xl font-bold text-gray-800">{kalanGun}</p>
+                             <p className="text-[9px] text-gray-500 uppercase font-bold">Gün Kaldı</p>
+                         </div>
+                     </div>
+                     
+                     {/* Form Bileşeni */}
+                     <AnneProfilFormu anne={anne} />
                 </div>
             </div>
 
